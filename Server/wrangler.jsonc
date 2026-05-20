@@ -1,0 +1,20 @@
+{
+  // Cloudflare Workers config. Rename `name` to whatever you want your subdomain to be.
+  // Run `npx wrangler deploy` to publish; `npx wrangler dev` to run locally.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-menu-proxy",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Default models. Override at deploy time with `wrangler secret put` if you want.
+  "vars": {
+    "GEMINI_TEXT_MODEL": "gemini-2.5-flash",
+    "GEMINI_IMAGE_MODEL": "gemini-2.5-flash-image"
+  }
+
+  // Required secrets (set via `npx wrangler secret put <NAME>`):
+  //   GEMINI_API_KEY        - your Google Gemini key
+  //   PROXY_SHARED_SECRET   - any random string; iOS app must send the same value in x-aimenu-secret
+}

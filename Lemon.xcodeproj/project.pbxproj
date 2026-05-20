@@ -1,0 +1,557 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0FE6D116DC43125BAA56DE7D /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6C5CB8F580D56F089AA169 /* TodayView.swift */; };
+		1E52711C10015EDF75BF8223 /* DishCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */; };
+		25B4AD38F4B234E198C99370 /* AddDishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50534020B41FF4DC606D8879 /* AddDishView.swift */; };
+		29C44640950636A2901C9034 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068D72F9D10EF09051C3C045 /* SettingsView.swift */; };
+		3B1CCF9AD52BEC57E40EF4F4 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A848EDC56979334846A942E /* CalendarView.swift */; };
+		40DB9DF7FFB2EDE178C7F5DD /* LemonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3D9F36963A016D7782EFE3 /* LemonApp.swift */; };
+		4B9EF70C4440955E55A44203 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC38E1E69C7860E372EFB497 /* Models.swift */; };
+		4C9E968F24FFE9804207767F /* Raleway.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FACA1AB05E33936BE80CF7A7 /* Raleway.ttf */; };
+		51E1821F32C6349D0F50B9D6 /* DishPhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C41C131B2FD0DF02B49658 /* DishPhotoViewer.swift */; };
+		549BC0588EE71E1CD604E700 /* FlowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 893DE56EC7B936527E674F21 /* FlowLayout.swift */; };
+		62FD58471E481A9DB4702B58 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 405905A703C43809865369AE /* GoogleService-Info.plist */; };
+		712CCF44FF0C4CF995345CA3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CB4A1BDF3744DA0C5000E48 /* Theme.swift */; };
+		73A39A13A38C51C7480AF316 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 1EB9FB56BCD025F02C2AAE46 /* FirebaseAppCheck */; };
+		7907CEAC88335B1C99996905 /* MenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 470C57DA661BF84180D12443 /* MenuView.swift */; };
+		7F8E9D0C1B2A38475640312F /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E9D0C1B2A38475640312F0E1 /* ProfileView.swift */; };
+		81EE67D0F1F776650E9D2C97 /* DishDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05073E100725819E0585F50F /* DishDetailView.swift */; };
+		8516D89FB83395BF5D1EDE56 /* ImageMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCC2D9CC95E676EA7E9355F /* ImageMetadata.swift */; };
+		9A6114630B5349094C7C437D /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC5FBC58995855B9FBE9CFBC /* GeminiService.swift */; };
+		A21EF31926DD24D520581F22 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F911CDEE6AF99EB0705803 /* AppConfig.swift */; };
+		AFFAA72D6A4671D4489BCD26 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4250330C89830A827095852B /* Assets.xcassets */; };
+		B108D3CD59336C9287EA5201 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 290C3DBAAFEB63ED78879F2E /* FirebaseCore */; };
+		B569CD7C6014362FE20B1040 /* GroupPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24AFA1C738CB9C9920E395E3 /* GroupPicker.swift */; };
+		C4A245CD8237746D5221BCBD /* FirebaseAILogic in Frameworks */ = {isa = PBXBuildFile; productRef = 85E10B8D67DA4A08C0B9CA90 /* FirebaseAILogic */; };
+		C4E5F60718293DA4B5C6D7E8 /* RecipeAssistantSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A4C5D6E7F8091A2B3C4D6E7 /* RecipeAssistantSheet.swift */; };
+		D153247B40C28C9287CB0F54 /* DishStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D94ADE4105D76D5A5B5044E4 /* DishStore.swift */; };
+		D6D589C089DF3870BA337D7B /* TaggedDishesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA4555D95837377851836C66 /* TaggedDishesView.swift */; };
+		D756BBE180E7776E96C6CA93 /* Inter.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 128AA7B61EA0502F21B58EAF /* Inter.ttf */; };
+		D9C34C9FF2037D6D653EF795 /* RecipeEditorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09B6EF35DDE43CFF81D94613 /* RecipeEditorSheet.swift */; };
+		E65956233BA64A07AA552FC1 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E102C9459C1FC01A8FE1F612 /* Preview Assets.xcassets */; };
+		F7E3D1C09B8A675948392817 /* DishEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D4F2A11C9B074E8F2A0041 /* DishEditView.swift */; };
+		FA13006EB396239A79FD6304 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33EF27AAB76650F99C543CA7 /* Foundation.framework */; };
+		FE123904C4DF1EFEFC770293 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545A041462A83D30DF15CDDC /* RootView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		05073E100725819E0585F50F /* DishDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishDetailView.swift; sourceTree = "<group>"; };
+		068D72F9D10EF09051C3C045 /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		09B6EF35DDE43CFF81D94613 /* RecipeEditorSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecipeEditorSheet.swift; sourceTree = "<group>"; };
+		128AA7B61EA0502F21B58EAF /* Inter.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = Inter.ttf; sourceTree = "<group>"; };
+		15B6A4BCBB113DF53C70AA25 /* Lemon.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lemon.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1CCC2D9CC95E676EA7E9355F /* ImageMetadata.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageMetadata.swift; sourceTree = "<group>"; };
+		24AFA1C738CB9C9920E395E3 /* GroupPicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupPicker.swift; sourceTree = "<group>"; };
+		2A848EDC56979334846A942E /* CalendarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
+		33EF27AAB76650F99C543CA7 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		405905A703C43809865369AE /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = text.plist; lastKnownFileType = text.plist; name = "GoogleService-Info.plist"; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		4250330C89830A827095852B /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		470C57DA661BF84180D12443 /* MenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MenuView.swift; sourceTree = "<group>"; };
+		4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishCardView.swift; sourceTree = "<group>"; };
+		50534020B41FF4DC606D8879 /* AddDishView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AddDishView.swift; sourceTree = "<group>"; };
+		545A041462A83D30DF15CDDC /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		59C41C131B2FD0DF02B49658 /* DishPhotoViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishPhotoViewer.swift; sourceTree = "<group>"; };
+		5D6C5CB8F580D56F089AA169 /* TodayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		7CB4A1BDF3744DA0C5000E48 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		893DE56EC7B936527E674F21 /* FlowLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
+		8E9D0C1B2A38475640312F0E1 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		9F3D9F36963A016D7782EFE3 /* LemonApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LemonApp.swift; sourceTree = "<group>"; };
+		A8F911CDEE6AF99EB0705803 /* AppConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		AC38E1E69C7860E372EFB497 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B3A4C5D6E7F8091A2B3C4D6E7 /* RecipeAssistantSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecipeAssistantSheet.swift; sourceTree = "<group>"; };
+		D94ADE4105D76D5A5B5044E4 /* DishStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishStore.swift; sourceTree = "<group>"; };
+		E102C9459C1FC01A8FE1F612 /* Preview Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		E8D4F2A11C9B074E8F2A0041 /* DishEditView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishEditView.swift; sourceTree = "<group>"; };
+		EA4555D95837377851836C66 /* TaggedDishesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaggedDishesView.swift; sourceTree = "<group>"; };
+		ED35C552D99D0B89E486C33F /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		FACA1AB05E33936BE80CF7A7 /* Raleway.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = Raleway.ttf; sourceTree = "<group>"; };
+		FC5FBC58995855B9FBE9CFBC /* GeminiService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3ACAAD1899F4677079D84802 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA13006EB396239A79FD6304 /* Foundation.framework in Frameworks */,
+				B108D3CD59336C9287EA5201 /* FirebaseCore in Frameworks */,
+				C4A245CD8237746D5221BCBD /* FirebaseAILogic in Frameworks */,
+				73A39A13A38C51C7480AF316 /* FirebaseAppCheck in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		23B4C2ADD54E2591E29FB290 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				E102C9459C1FC01A8FE1F612 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		35C74322E82780D37C385B50 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AC38E1E69C7860E372EFB497 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		3B354D76FC6CA2B423F3635D /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				33EF27AAB76650F99C543CA7 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		49F9EB355EAE67BF4645859C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3B354D76FC6CA2B423F3635D /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		54069E930DD08BED8ADEE7DC /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				15B6A4BCBB113DF53C70AA25 /* Lemon.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		6A04BD4D7F6FFB02CDBD0279 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				128AA7B61EA0502F21B58EAF /* Inter.ttf */,
+				FACA1AB05E33936BE80CF7A7 /* Raleway.ttf */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		71170DDB55197EE62F3D8E6C /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				A8F911CDEE6AF99EB0705803 /* AppConfig.swift */,
+				D94ADE4105D76D5A5B5044E4 /* DishStore.swift */,
+				FC5FBC58995855B9FBE9CFBC /* GeminiService.swift */,
+				1CCC2D9CC95E676EA7E9355F /* ImageMetadata.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		9CC5DD4C7E9CD3A3F70E62C5 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				50534020B41FF4DC606D8879 /* AddDishView.swift */,
+				2A848EDC56979334846A942E /* CalendarView.swift */,
+				4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */,
+				05073E100725819E0585F50F /* DishDetailView.swift */,
+				E8D4F2A11C9B074E8F2A0041 /* DishEditView.swift */,
+				59C41C131B2FD0DF02B49658 /* DishPhotoViewer.swift */,
+				893DE56EC7B936527E674F21 /* FlowLayout.swift */,
+				24AFA1C738CB9C9920E395E3 /* GroupPicker.swift */,
+				470C57DA661BF84180D12443 /* MenuView.swift */,
+				8E9D0C1B2A38475640312F0E1 /* ProfileView.swift */,
+				09B6EF35DDE43CFF81D94613 /* RecipeEditorSheet.swift */,
+				B3A4C5D6E7F8091A2B3C4D6E7 /* RecipeAssistantSheet.swift */,
+				545A041462A83D30DF15CDDC /* RootView.swift */,
+				068D72F9D10EF09051C3C045 /* SettingsView.swift */,
+				EA4555D95837377851836C66 /* TaggedDishesView.swift */,
+				5D6C5CB8F580D56F089AA169 /* TodayView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		ACDA703A606D755877DFBB79 = {
+			isa = PBXGroup;
+			children = (
+				54069E930DD08BED8ADEE7DC /* Products */,
+				49F9EB355EAE67BF4645859C /* Frameworks */,
+				B3370CDB33F95E327ACDAFCC /* Lemon */,
+			);
+			sourceTree = "<group>";
+		};
+		B3370CDB33F95E327ACDAFCC /* Lemon */ = {
+			isa = PBXGroup;
+			children = (
+				9F3D9F36963A016D7782EFE3 /* LemonApp.swift */,
+				ED35C552D99D0B89E486C33F /* Info.plist */,
+				B8F45B5426E0264D66650326 /* Theme */,
+				35C74322E82780D37C385B50 /* Models */,
+				71170DDB55197EE62F3D8E6C /* Services */,
+				9CC5DD4C7E9CD3A3F70E62C5 /* Views */,
+				6A04BD4D7F6FFB02CDBD0279 /* Fonts */,
+				4250330C89830A827095852B /* Assets.xcassets */,
+				23B4C2ADD54E2591E29FB290 /* Preview Content */,
+				405905A703C43809865369AE /* GoogleService-Info.plist */,
+			);
+			path = Lemon;
+			sourceTree = "<group>";
+		};
+		B8F45B5426E0264D66650326 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				7CB4A1BDF3744DA0C5000E48 /* Theme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		67F9F849C7DF61ACC9763ED7 /* Lemon */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6B9395121B5D777CC98A2340 /* Build configuration list for PBXNativeTarget "Lemon" */;
+			buildPhases = (
+				9331CC28DD2AC9F9B06B66E0 /* Sources */,
+				3ACAAD1899F4677079D84802 /* Frameworks */,
+				347F4181C34590E6504C61E1 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Lemon;
+			packageProductDependencies = (
+				290C3DBAAFEB63ED78879F2E /* FirebaseCore */,
+				85E10B8D67DA4A08C0B9CA90 /* FirebaseAILogic */,
+				1EB9FB56BCD025F02C2AAE46 /* FirebaseAppCheck */,
+			);
+			productName = Lemon;
+			productReference = 15B6A4BCBB113DF53C70AA25 /* Lemon.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		01730FF5C28629ADD7358AD6 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					67F9F849C7DF61ACC9763ED7 = {
+						DevelopmentTeam = 9A3K59XLG5;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 907F26A00B51DAE406E64006 /* Build configuration list for PBXProject "Lemon" */;
+			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = ACDA703A606D755877DFBB79;
+			packageReferences = (
+				4A8BC4C62FBC2A0D002BB9D9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
+			productRefGroup = 54069E930DD08BED8ADEE7DC /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				67F9F849C7DF61ACC9763ED7 /* Lemon */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		347F4181C34590E6504C61E1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D756BBE180E7776E96C6CA93 /* Inter.ttf in Resources */,
+				4C9E968F24FFE9804207767F /* Raleway.ttf in Resources */,
+				AFFAA72D6A4671D4489BCD26 /* Assets.xcassets in Resources */,
+				E65956233BA64A07AA552FC1 /* Preview Assets.xcassets in Resources */,
+				62FD58471E481A9DB4702B58 /* GoogleService-Info.plist in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		9331CC28DD2AC9F9B06B66E0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				40DB9DF7FFB2EDE178C7F5DD /* LemonApp.swift in Sources */,
+				712CCF44FF0C4CF995345CA3 /* Theme.swift in Sources */,
+				4B9EF70C4440955E55A44203 /* Models.swift in Sources */,
+				A21EF31926DD24D520581F22 /* AppConfig.swift in Sources */,
+				D153247B40C28C9287CB0F54 /* DishStore.swift in Sources */,
+				9A6114630B5349094C7C437D /* GeminiService.swift in Sources */,
+				8516D89FB83395BF5D1EDE56 /* ImageMetadata.swift in Sources */,
+				25B4AD38F4B234E198C99370 /* AddDishView.swift in Sources */,
+				3B1CCF9AD52BEC57E40EF4F4 /* CalendarView.swift in Sources */,
+				1E52711C10015EDF75BF8223 /* DishCardView.swift in Sources */,
+				81EE67D0F1F776650E9D2C97 /* DishDetailView.swift in Sources */,
+				F7E3D1C09B8A675948392817 /* DishEditView.swift in Sources */,
+				51E1821F32C6349D0F50B9D6 /* DishPhotoViewer.swift in Sources */,
+				549BC0588EE71E1CD604E700 /* FlowLayout.swift in Sources */,
+				B569CD7C6014362FE20B1040 /* GroupPicker.swift in Sources */,
+				7907CEAC88335B1C99996905 /* MenuView.swift in Sources */,
+				7F8E9D0C1B2A38475640312F /* ProfileView.swift in Sources */,
+				D9C34C9FF2037D6D653EF795 /* RecipeEditorSheet.swift in Sources */,
+				C4E5F60718293DA4B5C6D7E8 /* RecipeAssistantSheet.swift in Sources */,
+				FE123904C4DF1EFEFC770293 /* RootView.swift in Sources */,
+				29C44640950636A2901C9034 /* SettingsView.swift in Sources */,
+				D6D589C089DF3870BA337D7B /* TaggedDishesView.swift in Sources */,
+				0FE6D116DC43125BAA56DE7D /* TodayView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		6D9166357BE0394643B356A0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Lemon/Preview Content\"";
+				DEVELOPMENT_LANGUAGE = en;
+				DEVELOPMENT_TEAM = 9A3K59XLG5;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Lemon/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.lemonowo.app;
+				PRODUCT_NAME = Lemon;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		718F1FE7E13C5E751B1D3C69 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		7E7E0B5A0F768A8E01AB9B9A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Lemon/Preview Content\"";
+				DEVELOPMENT_LANGUAGE = en;
+				DEVELOPMENT_TEAM = 9A3K59XLG5;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Lemon/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-ObjC",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.lemonowo.app;
+				PRODUCT_NAME = Lemon;
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C40BC5432BB50A12627F2F02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		6B9395121B5D777CC98A2340 /* Build configuration list for PBXNativeTarget "Lemon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6D9166357BE0394643B356A0 /* Release */,
+				7E7E0B5A0F768A8E01AB9B9A /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		907F26A00B51DAE406E64006 /* Build configuration list for PBXProject "Lemon" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				718F1FE7E13C5E751B1D3C69 /* Debug */,
+				C40BC5432BB50A12627F2F02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4A8BC4C62FBC2A0D002BB9D9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.13.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1EB9FB56BCD025F02C2AAE46 /* FirebaseAppCheck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A8BC4C62FBC2A0D002BB9D9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAppCheck;
+		};
+		290C3DBAAFEB63ED78879F2E /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A8BC4C62FBC2A0D002BB9D9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		85E10B8D67DA4A08C0B9CA90 /* FirebaseAILogic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A8BC4C62FBC2A0D002BB9D9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAILogic;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 01730FF5C28629ADD7358AD6 /* Project object */;
+}

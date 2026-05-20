@@ -1,0 +1,4 @@
+# Copy to `.dev.vars` for `wrangler dev`. Never commit `.dev.vars`.
+# In production these values are set with `npx wrangler secret put <NAME>`.
+GEMINI_API_KEY="paste-your-gemini-key-here"
+PROXY_SHARED_SECRET="generate-a-random-string-and-put-the-same-value-in-the-iOS-app"

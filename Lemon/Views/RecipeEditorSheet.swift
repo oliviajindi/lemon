@@ -102,7 +102,7 @@ struct RecipeEditorSheet: View {
                                     .font(Theme.serif(15, weight: .semibold))
                                     .foregroundStyle(Theme.inkSoft)
                                     .padding(.top, 8)
-                                    .frame(minWidth: 22, alignment: .leading)
+                                    .frame(minWidth: 28, alignment: .leading)
                                 TextField("What happens at this step?",
                                           text: $steps[index].text,
                                           axis: .vertical)

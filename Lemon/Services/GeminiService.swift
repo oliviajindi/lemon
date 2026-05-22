@@ -55,9 +55,14 @@ actor GeminiService {
         if !trimmed.isEmpty {
             promptLines.append("The user also wrote: \"\(trimmed)\". Use it as a hint; if it conflicts with the photo, prefer the photo but mention the hint in shortDescription.")
         }
+        promptLines.append("IMPORTANT — Language rules:")
+        promptLines.append("- First, detect the language of the user's input text (and any text visible in the photo).")
+        promptLines.append("- Return the dish name and shortDescription in that SAME language. For example, if the user typed in Chinese, return the name and description in Chinese. If the user typed in Japanese, return in Japanese. And so on.")
+        promptLines.append("- If the input uses multiple languages, default to English.")
+        promptLines.append("- If there is no text input (photo only, no visible text), use English.")
         promptLines.append("For each dish:")
-        promptLines.append("- name: short, human-friendly Title Case, max 4 words.")
-        promptLines.append("- shortDescription: 1 sentence, max 12 words, no trailing period.")
+        promptLines.append("- name: short, human-friendly, max 4 words (in the detected language).")
+        promptLines.append("- shortDescription: 1 sentence, max 12 words, no trailing period (in the detected language).")
 
         var parts: [PartsRepresentable] = [promptLines.joined(separator: "\n")]
         if let img = image {
@@ -119,6 +124,39 @@ actor GeminiService {
             }
             return firstPart.data
         }
+    }
+
+    /// Generate a hand-drawn illustration based on a food photo. Returns PNG/JPEG bytes.
+    func generateIllustrationBasedOnPhoto(
+        dishName: String,
+        dishDescription: String,
+        image: UIImage
+    ) async throws -> Data {
+        let configuredModel = await MainActor.run { config.geminiImageModel }
+        let imageModelName = configuredModel.isEmpty ? "gemini-2.5-flash-image" : configuredModel
+        let style = await MainActor.run { config.illustrationStyle }
+        
+        let descTrim = dishDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        let subject = descTrim.isEmpty ? dishName : "\(dishName) — \(descTrim)"
+        let prompt = "\(style). Subject: \(subject). Please generate a beautiful hand-drawn illustration representing the dish in the provided photo, maintaining its layout and main elements but in the hand-drawn sketch style."
+
+        // If the user has an Imagen model selected, Imagen does not support multimodal text+image input
+        // for image output in FirebaseAILogic. Therefore, fallback to standard gemini-2.5-flash-image.
+        let targetModel = imageModelName.lowercased().contains("imagen") ? "gemini-2.5-flash-image" : imageModelName
+
+        let ai = FirebaseAI.firebaseAI(backend: .googleAI())
+        let model = ai.generativeModel(
+            modelName: targetModel,
+            generationConfig: GenerationConfig(
+                responseModalities: [.image]
+            )
+        )
+        
+        let response = try await model.generateContent([prompt, image])
+        guard let firstPart = response.inlineDataParts.first else {
+            throw GeminiError.empty
+        }
+        return firstPart.data
     }
 
     /// Extract a recipe (ingredients + steps) from a photo using the vision model.
@@ -326,6 +364,11 @@ actor GeminiService {
     private static let photoRecipePrompt = """
     You are reading a recipe from a photo. The photo may be a printed cookbook page, a handwritten recipe card, a screenshot, or a recipe written on paper.
 
+    IMPORTANT — Language rules:
+    - First, detect the language used in the recipe text visible in the photo.
+    - Return the ingredients and steps in that SAME language. For example, if the recipe is written in Chinese, return ingredients and steps in Chinese. If in Japanese, return in Japanese. And so on.
+    - If the recipe uses multiple languages, default to English.
+
     Extract two ordered lists:
     - ingredients: each entry is a single ingredient on its own line. Include the quantity, unit, and item when visible (e.g. "2 cups flour", "1 tbsp olive oil", "Salt to taste"). Do NOT bundle multiple ingredients into one entry. Do NOT include section headings like "For the sauce:" — they are not ingredients.
     - steps: each entry is one instruction step, in order. Write each step as a brief but complete sentence or two. Drop step numbers from the source (the app numbers them automatically).
@@ -338,6 +381,11 @@ actor GeminiService {
     private static func textRecipePrompt(userText: String) -> String {
         """
         You are extracting a recipe from free-form text the user typed or pasted in. The text may be a casual description ("spaghetti carbonara — eggs, pancetta, pecorino, pepper; cook pasta, fry pancetta, toss with egg…"), a blog excerpt, or a list.
+
+        IMPORTANT — Language rules:
+        - First, detect the language of the user's text below.
+        - Return the ingredients and steps in that SAME language. For example, if the text is in Chinese, return ingredients and steps in Chinese. If in Japanese, return in Japanese. And so on.
+        - If the text uses multiple languages, default to English.
 
         Extract two ordered lists:
         - ingredients: each entry is a single ingredient on its own line. Keep quantities/units when given (e.g. "2 cups flour", "1 tbsp olive oil", "Salt to taste"). Don't invent quantities the user didn't mention. Don't bundle multiple ingredients into one entry.
@@ -356,6 +404,11 @@ actor GeminiService {
 
     private static let videoRecipePrompt = """
     You are watching a cooking video. Extract the recipe being demonstrated.
+
+    IMPORTANT — Language rules:
+    - First, detect the primary language used in the video (spoken narration, on-screen text, captions).
+    - Return the ingredients and steps in that SAME language. For example, if the video is in Chinese, return ingredients and steps in Chinese. If in Japanese, return in Japanese. And so on.
+    - If the video uses multiple languages, default to English.
 
     Return two ordered lists:
     - ingredients: each entry is a single ingredient on its own line. Include the quantity, unit, and item if the video states or visibly shows them (e.g. "2 cups flour", "1 tbsp olive oil", "Salt to taste"). Don't invent quantities not shown or stated. Don't bundle multiple ingredients into one entry.

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 /// How dishes are rendered inside each menu section.
 ///
@@ -51,12 +52,19 @@ struct MenuView: View {
     @State private var newGroupName: String = ""
     @State private var newGroupEmoji: String = ""
     @State private var isAddingGroup = false
+    @State private var showingNewGroupEmojiPicker = false
     @State private var addingDishToGroup: DishGroup?
     @State private var isAddingDish = false
 
     /// IDs of collapsed sections. We use the group's own UUID for real groups
     /// and `Self.ungroupedSectionID` for the "Other Dishes" pseudo-section.
     @State private var collapsedIDs: Set<UUID> = Self.loadCollapsedIDs()
+    @State private var preDragCollapsedIDs: Set<UUID> = []
+    
+    @State private var isEditingGroups = false
+    @State private var preEditCollapsedIDs: Set<UUID> = []
+    @State private var draggedGroup: DishGroup? = nil
+    @State private var isDraggingDish = false
 
     /// Sentinel ID representing the "Other Dishes" / "All Dishes" section so
     /// it can participate in the same collapse machinery as real groups.
@@ -67,16 +75,22 @@ struct MenuView: View {
         NavigationStack {
             ZStack(alignment: .bottomTrailing) {
                 Theme.paper.ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
 
                 if dishes.isEmpty && groups.isEmpty {
                     EmptyMenuView()
                 } else {
                     ScrollView {
-                        VStack(spacing: 28) {
+                        VStack(spacing: isEditingGroups ? 8 : 4) {
                             MenuHeader(
                                 title: $menuTitle,
-                                subtitle: $menuSubtitle
+                                subtitle: $menuSubtitle,
+                                isEditing: $isEditingGroups
                             )
+                            .padding(.bottom, isEditingGroups ? 0 : 16)
 
                             ForEach(groups) { group in
                                 MenuSection(
@@ -84,9 +98,23 @@ struct MenuView: View {
                                     dishes: dishesIn(group),
                                     layout: layout,
                                     isCollapsed: collapsedIDs.contains(group.id),
+                                    isEditingGroups: isEditingGroups,
+                                    isDraggingDish: isDraggingDish,
+                                    draggedGroup: $draggedGroup,
+                                    groups: groups,
                                     onToggle: { toggleCollapsed(group.id) },
                                     onAdd: { addingDishToGroup = group },
-                                    onDelete: { store.deleteGroup(group) }
+                                    onDelete: { store.deleteGroup(group) },
+                                    onDragStart: handleDragStart,
+                                    onDropDish: { dish in
+                                        store.setGroup(group, for: dish)
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            var nextCollapsed = preDragCollapsedIDs
+                                            nextCollapsed.remove(group.id)
+                                            collapsedIDs = nextCollapsed
+                                        }
+                                        isDraggingDish = false
+                                    }
                                 )
                             }
 
@@ -100,9 +128,23 @@ struct MenuView: View {
                                     dishes: ungrouped,
                                     layout: layout,
                                     isCollapsed: collapsedIDs.contains(Self.ungroupedSectionID),
+                                    isEditingGroups: isEditingGroups,
+                                    isDraggingDish: isDraggingDish,
+                                    draggedGroup: nil,
+                                    groups: [],
                                     onToggle: { toggleCollapsed(Self.ungroupedSectionID) },
                                     onAdd: nil,
-                                    onDelete: {}
+                                    onDelete: {},
+                                    onDragStart: handleDragStart,
+                                    onDropDish: { dish in
+                                        store.setGroup(nil, for: dish)
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            var nextCollapsed = preDragCollapsedIDs
+                                            nextCollapsed.remove(Self.ungroupedSectionID)
+                                            collapsedIDs = nextCollapsed
+                                        }
+                                        isDraggingDish = false
+                                    }
                                 )
                             }
 
@@ -110,12 +152,20 @@ struct MenuView: View {
                                 name: $newGroupName,
                                 emoji: $newGroupEmoji,
                                 isAdding: $isAddingGroup,
+                                onTapEmoji: { showingNewGroupEmojiPicker = true },
                                 onCreate: createGroup
                             )
                                 .padding(.top, 4)
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 120)
+                        .background(
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                }
+                        )
                     }
                     .paperBackground()
                 }
@@ -124,15 +174,23 @@ struct MenuView: View {
                     .padding(.trailing, 22)
                     .padding(.bottom, 28)
             }
+            .onDrop(of: [.text], isTargeted: nil) { providers in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    collapsedIDs = preDragCollapsedIDs
+                }
+                isDraggingDish = false
+                return true
+            }
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Dish.self) { DishDetailView(dish: $0) }
+            .navigationDestination(for: DishGroup.self) { GroupDetailView(group: $0) }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Picker("View", selection: $layout) {
                         ForEach(MenuLayout.allCases) { mode in
                             Image(systemName: mode.iconName)
-                                .accessibilityLabel(mode.accessibilityLabel)
-                                .tag(mode)
+                               .accessibilityLabel(mode.accessibilityLabel)
+                               .tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
@@ -147,6 +205,26 @@ struct MenuView: View {
             .sheet(isPresented: $isAddingDish) {
                 AddDishView {
                     isAddingDish = false
+                }
+            }
+            .sheet(isPresented: $showingNewGroupEmojiPicker) {
+                EmojiPickerSheet(currentEmoji: newGroupEmoji) { emoji in
+                    newGroupEmoji = emoji
+                    showingNewGroupEmojiPicker = false
+                } onClear: {
+                    newGroupEmoji = ""
+                    showingNewGroupEmojiPicker = false
+                }
+                .presentationDetents([.medium, .large])
+            }
+            .onChange(of: isEditingGroups) { _, newValue in
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    if newValue {
+                        preEditCollapsedIDs = collapsedIDs
+                        collapsedIDs = Set(groups.map(\.id) + [Self.ungroupedSectionID])
+                    } else {
+                        collapsedIDs = preEditCollapsedIDs
+                    }
                 }
             }
         }
@@ -196,6 +274,20 @@ struct MenuView: View {
         Self.saveCollapsedIDs(collapsedIDs)
     }
 
+    private func handleDragStart(for dish: Dish) {
+        isDraggingDish = true
+        preDragCollapsedIDs = collapsedIDs
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            var nextCollapsed = Set(groups.map(\.id) + [Self.ungroupedSectionID])
+            if let sourceGroup = dish.group {
+                nextCollapsed.remove(sourceGroup.id)
+            } else {
+                nextCollapsed.remove(Self.ungroupedSectionID)
+            }
+            collapsedIDs = nextCollapsed
+        }
+    }
+
     private func createGroup() {
         let name = newGroupName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else {
@@ -228,8 +320,7 @@ struct MenuView: View {
 private struct MenuHeader: View {
     @Binding var title: String
     @Binding var subtitle: String
-
-    @State private var isEditing = false
+    @Binding var isEditing: Bool
     @FocusState private var focusedField: Field?
 
     private enum Field { case title, subtitle }
@@ -291,7 +382,6 @@ private struct MenuHeader: View {
                     finishEditing()
                 } else {
                     isEditing = true
-                    focusedField = .title
                 }
             } label: {
                 HStack(spacing: 6) {
@@ -339,13 +429,18 @@ private struct MenuSection: View {
     let dishes: [Dish]
     let layout: MenuLayout
     let isCollapsed: Bool
+    var isEditingGroups: Bool = false
+    var isDraggingDish: Bool = false
+    var draggedGroup: Binding<DishGroup?>? = nil
+    var groups: [DishGroup] = []
     let onToggle: () -> Void
     let onAdd: (() -> Void)?
     let onDelete: () -> Void
+    var onDragStart: ((Dish) -> Void)? = nil
+    var onDropDish: ((Dish) -> Void)? = nil
 
-    @State private var draftEmoji: String = ""
-    @State private var showingEmojiPicker = false
     @State private var pendingAction: SectionAction?
+    @State private var isTargeted = false
 
     /// The ellipsis-menu action awaiting a paper-styled sheet response.
     fileprivate enum SectionAction: Int, Identifiable {
@@ -375,113 +470,203 @@ private struct MenuSection: View {
             // Header: the logo is editable on its own; the title row toggles
             // collapse/expand. Renaming and deleting live in the ellipsis menu
             // so a plain tap never opens an editor by accident.
-            HStack(spacing: 8) {
-                Button(action: onToggle) {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
+            if isEditingGroups, let group = group {
+                HStack(spacing: 8) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.inkSoft)
-                        .rotationEffect(.degrees(isCollapsed ? -90 : 0))
-                }
-                .buttonStyle(.plain)
+                        .padding(.trailing, 4)
 
-                groupLogo
-
-                groupNameDisplay
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let onAdd {
-                    Button(action: onAdd) {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 18, weight: .semibold))
+                    groupLogo
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(resolvedTitle)
+                            .font(Theme.groupName(16))
                             .foregroundStyle(Theme.ink)
+                        Text(resolvedSubtitle)
+                            .font(Theme.hand(12))
+                            .foregroundStyle(Theme.inkFaded)
+                        Spacer(minLength: 0)
+                    }
+                }
+                .padding(6)
+                .background(Color.clear)
+                .cornerRadius(8)
+                .contentShape(Rectangle())
+                .onDrag {
+                    if let draggedGroup = draggedGroup {
+                        draggedGroup.wrappedValue = group
+                    }
+                    return NSItemProvider(object: group.id.uuidString as NSString)
+                }
+                .onDrop(of: [.text], delegate: GroupDropDelegate(
+                    item: group,
+                    draggedItem: draggedGroup ?? .constant(nil),
+                    groups: groups,
+                    store: store
+                ))
+            } else {
+                HStack(spacing: 8) {
+                    Button(action: onToggle) {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.inkSoft)
+                            .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Add dish to \(resolvedTitle)")
-                }
+                    .accessibilityLabel(isCollapsed ? "Expand \(resolvedTitle)" : "Collapse \(resolvedTitle)")
 
-                if canEdit, group != nil {
-                    Menu {
-                        Button {
-                            pendingAction = .rename
-                        } label: { Label("Rename", systemImage: "pencil") }
-                        Button(role: .destructive) {
-                            pendingAction = .delete
-                        } label: { Label("Delete group", systemImage: "trash") }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(Theme.inkSoft)
-                            .padding(.leading, 4)
+                    if let group {
+                        NavigationLink(value: group) {
+                            HStack(spacing: 8) {
+                                groupLogo
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(resolvedTitle)
+                                        .font(Theme.groupName(21))
+                                        .foregroundStyle(Theme.ink)
+                                    Text(resolvedSubtitle)
+                                        .font(Theme.hand(14))
+                                        .foregroundStyle(Theme.inkFaded)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Button(action: onToggle) {
+                            HStack(spacing: 8) {
+                                groupLogo
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(resolvedTitle)
+                                        .font(Theme.groupName(isEditingGroups ? 16 : 21))
+                                        .foregroundStyle(Theme.ink)
+                                    Text(resolvedSubtitle)
+                                        .font(Theme.hand(isEditingGroups ? 12 : 14))
+                                        .foregroundStyle(Theme.inkFaded)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if let onAdd {
+                        Button(action: onAdd) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add dish to \(resolvedTitle)")
+                    }
+
+                    if canEdit, group != nil {
+                        Menu {
+                            Button {
+                                pendingAction = .rename
+                            } label: { Label("Rename", systemImage: "pencil") }
+                            Button(role: .destructive) {
+                                pendingAction = .delete
+                            } label: { Label("Delete group", systemImage: "trash") }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .foregroundStyle(Theme.inkSoft)
+                                .padding(.leading, 4)
+                        }
                     }
                 }
-            }
-
-            Rectangle()
-                .fill(Theme.ink)
-                .frame(height: 1)
-                .opacity(0.6)
-
-            // The dishes live inside a clipped wrapper so the expand/collapse
-            // animation reads as the dishes rolling down out from underneath
-            // the group's title line, rather than flying in from the top of
-            // the screen. `.move(edge: .top)` slides the dishes down into
-            // position, and the surrounding clip masks anything still above
-            // the wrapper's bounds — giving an accordion reveal.
-            VStack(spacing: 0) {
-                if !isCollapsed {
-                    Group {
-                        if dishes.isEmpty {
-                            Text("No dishes yet — add one from the + tab.")
-                                .font(Theme.serif(13).italic())
-                                .foregroundStyle(Theme.inkFaded)
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            VStack(spacing: 0) {
-                                ForEach(dishes) { dish in
-                                    NavigationLink(value: dish) {
-                                        if layout == .cards {
-                                            DishCardView(dish: dish)
-                                        } else {
-                                            CompactDishRow(dish: dish)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            store.deleteDish(dish)
-                                        } label: { Label("Remove", systemImage: "trash") }
-                                    }
-                                    if dish != dishes.last, layout == .cards {
-                                        DottedDivider().padding(.horizontal, 4)
-                                    }
+                .padding(6)
+                .background(isTargeted ? Theme.highlight.opacity(0.18) : Color.clear)
+                .cornerRadius(8)
+                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isTargeted)
+                .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
+                    guard let provider = providers.first else { return false }
+                    _ = provider.loadObject(ofClass: NSString.self) { string, error in
+                        if let uuidString = string as? String,
+                           let uuid = UUID(uuidString: uuidString) {
+                            DispatchQueue.main.async {
+                                if let dish = store.allDishes().first(where: { $0.id == uuid }) {
+                                    onDropDish?(dish)
                                 }
                             }
                         }
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    return true
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .top)
-            .clipped()
-        }
-        .padding(8)
-        .onAppear {
-            draftEmoji = group?.emoji ?? ""
-        }
-        .sheet(isPresented: $showingEmojiPicker) {
-            if let group {
-                EmojiPickerSheet(currentEmoji: group.emoji ?? "") { emoji in
-                    store.updateGroupEmoji(group, emoji: emoji)
-                    draftEmoji = emoji
-                    showingEmojiPicker = false
-                } onClear: {
-                    store.updateGroupEmoji(group, emoji: nil)
-                    draftEmoji = ""
-                    showingEmojiPicker = false
+
+            // Separator + dishes form a single accordion body. Gating them
+            // through one `if !isCollapsed` means SwiftUI removes them as a
+            // single transitioning unit, so the divider and rows slide up
+            // together instead of as two disconnected ghosts.
+            //
+            // Crucially: the "expanded breathing room" (extra bottom padding)
+            // lives *inside* this conditional, not on the outer modifier
+            // chain. That way the header above never sees an animated
+            // padding value — the spring can't bounce a number that
+            // doesn't change.
+            if !isCollapsed {
+                VStack(alignment: .leading, spacing: 10) {
+                    if !isEditingGroups {
+                        Rectangle()
+                            .fill(Theme.ink)
+                            .frame(height: 1)
+                            .opacity(0.6)
+                    }
+
+                    if dishes.isEmpty {
+                        Text("No dishes yet — add one from the + tab.")
+                            .font(Theme.serif(13).italic())
+                            .foregroundStyle(Theme.inkFaded)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(dishes) { dish in
+                                NavigationLink(value: dish) {
+                                    if layout == .cards {
+                                        DishCardView(dish: dish, isCompactStyle: isDraggingDish)
+                                    } else {
+                                        CompactDishRow(dish: dish, isCompactStyle: isDraggingDish)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        store.deleteDish(dish)
+                                    } label: { Label("Remove", systemImage: "trash") }
+                                }
+                                .onDrag {
+                                    if let onDragStart {
+                                        onDragStart(dish)
+                                    }
+                                    return NSItemProvider(object: dish.id.uuidString as NSString)
+                                }
+                                if dish != dishes.last, layout == .cards {
+                                    DottedDivider().padding(.horizontal, 4)
+                                }
+                            }
+                        }
+                    }
                 }
-                .presentationDetents([.medium, .large])
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.bottom, isEditingGroups ? 0 : 14)
+                .zIndex(-1)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        // Keep the outer paddings CONSTANT relative to `isCollapsed`. The
+        // header's Y origin is therefore a fixed offset from the section's
+        // top edge — the spring has no padding value to bounce, so the
+        // header can't jitter.
+        .padding(.vertical, isEditingGroups ? 2 : 8)
+        .padding(.horizontal, isEditingGroups ? 0 : 8)
+        // Clip on the OUTER section — this frame keeps real geometry
+        // during the animation (header + padding), so the transition
+        // ghost is masked against the section's real bounds rather than
+        // a 0pt inner wrapper.
+        .clipped()
         .sheet(item: $pendingAction) { action in
             actionSheet(for: action)
                 .presentationDetents([.height(320)])
@@ -512,50 +697,16 @@ private struct MenuSection: View {
     }
 
     @ViewBuilder
-    private var groupNameDisplay: some View {
-        Button(action: onToggle) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(resolvedTitle)
-                    .font(Theme.groupName(21))
-                    .foregroundStyle(Theme.ink)
-                Text(resolvedSubtitle)
-                    .font(Theme.hand(14))
-                    .foregroundStyle(Theme.inkFaded)
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(resolvedTitle), \(resolvedSubtitle)")
-        .accessibilityHint(isCollapsed ? "Double tap to expand" : "Double tap to collapse")
-    }
-
-    @ViewBuilder
     private var groupLogo: some View {
-        if let group {
-            Button {
-                draftEmoji = group.emoji ?? ""
-                showingEmojiPicker = true
-            } label: {
-                if let emoji = resolvedEmoji {
-                    Text(emoji)
-                        .font(.system(size: 22))
-                        .frame(width: 32, height: 28)
-                } else {
-                    Image(systemName: resolvedIcon)
-                        .foregroundStyle(Theme.ink)
-                        .frame(width: 32, height: 28)
-                }
-            }
-            .buttonStyle(.plain)
-            .contentShape(Rectangle())
-            .accessibilityLabel("Group emoji")
-        } else if let emoji = resolvedEmoji {
+        if let emoji = resolvedEmoji {
             Text(emoji)
-                .font(.system(size: 22))
+                .font(.system(size: isEditingGroups ? 16 : 22))
+                .frame(width: isEditingGroups ? 24 : 32, height: isEditingGroups ? 22 : 28)
         } else {
             Image(systemName: resolvedIcon)
+                .font(.system(size: isEditingGroups ? 13 : 16))
                 .foregroundStyle(Theme.ink)
+                .frame(width: isEditingGroups ? 24 : 32, height: isEditingGroups ? 22 : 28)
         }
     }
 }
@@ -567,24 +718,25 @@ private struct MenuSection: View {
 /// the row drills into the detail view.
 private struct CompactDishRow: View {
     let dish: Dish
+    var isCompactStyle: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
             Text("•")
-                .font(Theme.serif(20))
+                .font(Theme.serif(isCompactStyle ? 14 : 20))
                 .foregroundStyle(Theme.inkSoft)
                 .frame(width: 8, alignment: .leading)
             Text(dish.name)
-                .font(Theme.menuDishName(14))
+                .font(Theme.menuDishName(isCompactStyle ? 11 : 14))
                 .foregroundStyle(Theme.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Spacer(minLength: 8)
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: isCompactStyle ? 9 : 11, weight: .semibold))
                 .foregroundStyle(Theme.inkFaded)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, isCompactStyle ? 4 : 8)
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
     }
@@ -594,32 +746,30 @@ private struct NewGroupEditor: View {
     @Binding var name: String
     @Binding var emoji: String
     @Binding var isAdding: Bool
+    let onTapEmoji: () -> Void
     let onCreate: () -> Void
 
     @FocusState private var nameFocused: Bool
-    @FocusState private var emojiFocused: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            if isAdding {
-                TextField("🍋", text: $emoji)
-                    .font(.system(size: 18))
-                    .multilineTextAlignment(.center)
-                    .focused($emojiFocused)
-                    .frame(width: 42)
-                    .padding(.vertical, 9)
-                    .background(Color.white.opacity(0.45))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
-                    )
-                    .onChange(of: emoji) { _, newValue in
-                        if let first = newValue.first, newValue.count > 1 {
-                            emoji = String(first)
-                        }
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
+        if isAdding {
+            HStack(spacing: 10) {
+                Button {
+                    onTapEmoji()
+                } label: {
+                    Text(emoji.isEmpty ? "🍋" : emoji)
+                        .font(.system(size: 18))
+                        .frame(width: 42)
+                        .padding(.vertical, 9)
+                        .background(Color.white.opacity(0.45))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .move(edge: .leading)))
 
                 TextField("New group name", text: $name)
                     .font(Theme.hand(15))
@@ -636,45 +786,53 @@ private struct NewGroupEditor: View {
                             .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
                     )
                     .transition(.opacity.combined(with: .move(edge: .trailing)))
-            } else {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus.circle")
+
+                Button(action: onCreate) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)
+            .background(Color.white.opacity(0.32))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
+            )
+        } else {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                    isAdding = true
+                }
+                nameFocused = true
+            } label: {
+                HStack(spacing: 10) {
                     Text("New Group")
                         .font(Theme.hand(15))
+                        .foregroundStyle(Theme.ink)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 9)
                 }
-                .foregroundStyle(Theme.ink)
-                .frame(maxWidth: .infinity, alignment: .center)
-            }
-
-            Button {
-                if isAdding {
-                    onCreate()
-                } else {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        isAdding = true
-                    }
-                    emojiFocused = true
-                }
-            } label: {
-                Image(systemName: isAdding ? "checkmark.circle.fill" : "plus.circle")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Theme.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.32))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
+                )
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.32))
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
-        )
     }
 }
 
-private struct EmojiPickerSheet: View {
+struct EmojiPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let currentEmoji: String
@@ -808,7 +966,7 @@ private struct EmojiPickerSheet: View {
     ]
 }
 
-private struct EmojiOption: Identifiable {
+struct EmojiOption: Identifiable {
     let emoji: String
     let keywords: [String]
     var id: String { emoji }
@@ -999,6 +1157,30 @@ private struct PaperSheetButton: View {
         case .secondary:
             RoundedRectangle(cornerRadius: 999)
                 .strokeBorder(Theme.ink.opacity(0.55), style: StrokeStyle(lineWidth: 1.2))
+        }
+    }
+}
+
+// MARK: - Group Drag and Drop Reordering Delegate
+
+struct GroupDropDelegate: DropDelegate {
+    let item: DishGroup
+    @Binding var draggedItem: DishGroup?
+    let groups: [DishGroup]
+    let store: DishStore
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedItem = nil
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard let dragged = draggedItem, dragged.id != item.id else { return }
+        
+        if let targetIndex = groups.firstIndex(where: { $0.id == item.id }) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                store.moveGroup(dragged, to: targetIndex)
+            }
         }
     }
 }

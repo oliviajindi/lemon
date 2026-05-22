@@ -19,6 +19,7 @@ struct AddDishView: View {
     @State private var inputText: String = ""
     @State private var photoItem: PhotosPickerItem?
     @State private var sourceImage: UIImage?
+    @State private var sourceImageData: Data? = nil
 
     @State private var candidates: [DishCandidate] = []
     @State private var batchGroup: DishGroup?
@@ -70,7 +71,7 @@ struct AddDishView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Add to your menu")
+            Text("Add A New Dish")
                 .font(Theme.display(30))
                 .foregroundStyle(Theme.ink)
             Text(stepDescription)
@@ -82,7 +83,7 @@ struct AddDishView: View {
     private var stepDescription: String {
         switch step {
         case .input:
-            return "Type the dish, pick a photo, or both. The AI will draw each dish it finds."
+            return "Type the dish, pick a photo, or both. Lemon will draw each dish it finds!"
         case .preview:
             let n = activeCandidates.count
             if n <= 1 { return "Tweak the name if needed, then add it to your menu." }
@@ -116,7 +117,7 @@ struct AddDishView: View {
 
                 HStack(spacing: 12) {
                     PhotosPicker(selection: $photoItem, matching: .images) {
-                        Label(sourceImage == nil ? "Pick a photo" : "Change photo",
+                        Label(sourceImage == nil ? "Pick a Photo" : "Change Photo",
                               systemImage: "photo")
                             .font(Theme.hand(15))
                             .padding(.horizontal, 14)
@@ -132,6 +133,7 @@ struct AddDishView: View {
                     if sourceImage != nil {
                         Button("Remove photo") {
                             sourceImage = nil
+                            sourceImageData = nil
                             photoItem = nil
                         }
                         .font(Theme.hand(14))
@@ -176,16 +178,18 @@ struct AddDishView: View {
     }
 
     private var actionLabel: String {
-        if sourceImage != nil { return "Find dishes & draw" }
+        if sourceImage != nil { return "Draw it!" }
         return "Draw it"
     }
 
     private func loadPickedPhoto(_ item: PhotosPickerItem?) async {
         guard let item else { return }
+        defer { photoItem = nil }
         do {
             if let data = try await item.loadTransferable(type: Data.self),
                let img = UIImage(data: data) {
                 sourceImage = img
+                sourceImageData = data
             } else {
                 error = "Couldn't read that photo."
             }
@@ -201,7 +205,7 @@ struct AddDishView: View {
         do {
             let ids = try await store.identify(text: inputText, image: sourceImage)
             candidates = ids.map {
-                DishCandidate(name: $0.name, description: $0.shortDescription, isGenerating: true)
+                DishCandidate(name: $0.name, description: "", aiDescription: $0.shortDescription, isGenerating: true)
             }
             step = .preview
         } catch {
@@ -280,12 +284,13 @@ struct AddDishView: View {
         candidates[startIdx].error = nil
         let name = candidates[startIdx].name
         let desc = candidates[startIdx].description
+        let aiDesc = candidates[startIdx].aiDescription
         let hint = artDirection.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             let data = try await store.gemini.generateIllustration(
                 dishName: name,
-                dishDescription: desc,
+                dishDescription: desc.isEmpty ? aiDesc : desc,
                 artDirection: hint.isEmpty ? nil : hint
             )
             if let idx = candidates.firstIndex(where: { $0.id == id }) {
@@ -303,6 +308,7 @@ struct AddDishView: View {
     // MARK: - Save / reset
 
     private func saveAll() {
+        let takenAt = sourceImageData?.exifCaptureDate()
         for cand in candidates {
             let name = cand.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
@@ -314,6 +320,10 @@ struct AddDishView: View {
                 tags: DishTags.parsed(from: cand.tagsText)
             )
             store.insertDish(dish)
+            
+            if let sourceImage {
+                store.addPhoto(sourceImage, caption: "Imported from photo", takenAt: takenAt, to: dish)
+            }
         }
         reset()
         onSaved()
@@ -324,6 +334,7 @@ struct AddDishView: View {
         inputText = ""
         photoItem = nil
         sourceImage = nil
+        sourceImageData = nil
         candidates = []
         batchGroup = nil
         error = nil
@@ -336,6 +347,7 @@ struct DishCandidate: Identifiable, Equatable {
     let id: UUID = UUID()
     var name: String
     var description: String
+    var aiDescription: String = ""
     var tagsText: String = ""
     var illustration: Data? = nil
     var isGenerating: Bool = false
@@ -345,6 +357,7 @@ struct DishCandidate: Identifiable, Equatable {
         l.id == r.id &&
         l.name == r.name &&
         l.description == r.description &&
+        l.aiDescription == r.aiDescription &&
         l.tagsText == r.tagsText &&
         l.illustration == r.illustration &&
         l.isGenerating == r.isGenerating &&

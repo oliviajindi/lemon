@@ -56,73 +56,115 @@ private struct ProfileGroupRowGlyph: View {
     }
 }
 
-struct ProfileDishesListView: View {
-    @Query(sort: \Dish.createdAt, order: .reverse) private var dishes: [Dish]
-
-    var body: some View {
-        Group {
-            if dishes.isEmpty {
-                ContentUnavailableView(
-                    "No dishes yet",
-                    systemImage: "book.closed",
-                    description: Text("Add dishes from the Menu tab.")
-                )
-            } else {
-                List(dishes) { dish in
-                    NavigationLink(value: dish) {
-                        Text(dish.name)
-                            .font(Theme.dishName(17, weight: .light))
-                    }
-                    .listRowBackground(Color.clear)
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-            }
-        }
-        .paperBackground()
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("All Dishes")
-                    .font(Theme.title(18, weight: .bold))
-                    .foregroundStyle(Theme.ink)
-            }
-        }
-    }
-}
-
-struct ProfileGroupsListView: View {
+struct ProfileDishesGroupsView: View {
     @Query(sort: [SortDescriptor(\DishGroup.displayOrder), SortDescriptor(\DishGroup.createdAt)])
     private var groups: [DishGroup]
 
+    @Query(sort: \Dish.createdAt, order: .reverse) private var dishes: [Dish]
+
+    private var ungroupedDishes: [Dish] {
+        dishes.filter { $0.group == nil }
+    }
+
     var body: some View {
-        Group {
-            if groups.isEmpty {
-                ContentUnavailableView(
-                    "No groups yet",
-                    systemImage: "folder",
-                    description: Text("Create a group from the Menu tab.")
-                )
-            } else {
-                List(groups) { group in
-                    NavigationLink(value: group) {
-                        HStack(spacing: 10) {
-                            ProfileGroupRowGlyph(group: group)
-                            Text(group.name)
-                                .font(Theme.dishName(17, weight: .medium))
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                if groups.isEmpty && dishes.isEmpty {
+                    ContentUnavailableView(
+                        "No dishes yet",
+                        systemImage: "book.closed",
+                        description: Text("Add dishes from the Menu tab.")
+                    )
+                    .padding(.top, 40)
+                } else {
+                    // Render all custom groups in a unified card container
+                    if !groups.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "folder")
+                                    .foregroundStyle(Theme.ink)
+                                    .frame(width: 32, height: 28)
+                                Text("Groups")
+                                    .font(Theme.groupName(21))
+                                    .foregroundStyle(Theme.ink)
+                                Spacer()
+                            }
+
+                            VStack(spacing: 0) {
+                                ForEach(groups) { group in
+                                    NavigationLink(value: group) {
+                                        HStack(spacing: 12) {
+                                            ProfileGroupRowGlyph(group: group)
+                                            Text(group.name)
+                                                .font(Theme.menuDishName(16, weight: .semibold))
+                                                .foregroundStyle(Theme.ink)
+                                            Spacer()
+                                            
+                                            Text("\(group.dishes.count) \(group.dishes.count == 1 ? "dish" : "dishes")")
+                                                .font(Theme.hand(12))
+                                                .foregroundStyle(Theme.inkFaded)
+                                            
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(Theme.inkSoft)
+                                        }
+                                        .padding(.vertical, 14)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    if group != groups.last {
+                                        DottedDivider().padding(.horizontal, 4)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 14)
+                            .background(Color.white.opacity(0.35))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .cardStroke(cornerRadius: 16)
                         }
                     }
-                    .listRowBackground(Color.clear)
+
+                    // Render ungrouped dishes if present
+                    if !ungroupedDishes.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "book.closed")
+                                    .foregroundStyle(Theme.ink)
+                                    .frame(width: 32, height: 28)
+                                Text(groups.isEmpty ? "All Dishes" : "Other Dishes")
+                                    .font(Theme.groupName(21))
+                                    .foregroundStyle(Theme.ink)
+                                Spacer()
+                            }
+
+                            VStack(spacing: 0) {
+                                ForEach(ungroupedDishes) { dish in
+                                    NavigationLink(value: dish) {
+                                        DishCardView(dish: dish)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    if dish != ungroupedDishes.last {
+                                        DottedDivider().padding(.horizontal, 4)
+                                    }
+                                }
+                            }
+                            .padding(14)
+                            .background(Color.white.opacity(0.35))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .cardStroke(cornerRadius: 16)
+                        }
+                    }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
             }
+            .padding(20)
         }
         .paperBackground()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("Groups")
+                Text("Dishes & Groups")
                     .font(Theme.title(18, weight: .bold))
                     .foregroundStyle(Theme.ink)
             }
@@ -130,30 +172,169 @@ struct ProfileGroupsListView: View {
     }
 }
 
-struct ProfileGroupDetailView: View {
-    let group: DishGroup
+struct ProfilePhotosListView: View {
+    @EnvironmentObject private var store: DishStore
+    @Query(sort: \DishPhoto.addedAt, order: .reverse) private var photos: [DishPhoto]
+    
+    @State private var viewerPhoto: DishPhoto?
 
-    private var dishes: [Dish] {
-        group.dishes.sorted {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+    private let columns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
+    private var groupedPhotos: [(date: Date, photos: [DishPhoto])] {
+        var seenData = Set<Data>()
+        var uniquePhotos: [DishPhoto] = []
+        for photo in photos {
+            if !seenData.contains(photo.imageData) {
+                seenData.insert(photo.imageData)
+                uniquePhotos.append(photo)
+            }
         }
+        
+        let grouped = Dictionary(grouping: uniquePhotos) { photo in
+            Calendar.current.startOfDay(for: photo.effectiveDate)
+        }
+        return grouped.map { (date: $0.key, photos: $0.value) }
+            .sorted { $0.date > $1.date }
     }
 
     var body: some View {
         Group {
-            if dishes.isEmpty {
+            if photos.isEmpty {
                 ContentUnavailableView(
-                    "No dishes in \(group.name)",
-                    systemImage: "tray",
-                    description: Text("Assign dishes to this group from the Menu tab.")
+                    "No photos yet",
+                    systemImage: "photo.on.rectangle.angled",
+                    description: Text("Snap real photos of your dishes in the Menu tab.")
                 )
             } else {
-                List(dishes) { dish in
-                    NavigationLink(value: dish) {
-                        Text(dish.name)
-                            .font(Theme.dishName(17, weight: .medium))
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        ForEach(groupedPhotos, id: \.date) { group in
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text(group.date.formatted(date: .complete, time: .omitted))
+                                    .font(Theme.serif(14, weight: .bold))
+                                    .tracking(1)
+                                    .foregroundStyle(Theme.inkSoft)
+                                    .padding(.horizontal, 4)
+                                
+                                LazyVGrid(columns: columns, spacing: 12) {
+                                    ForEach(group.photos) { photo in
+                                        Button {
+                                            viewerPhoto = photo
+                                        } label: {
+                                            Rectangle()
+                                                .fill(Color.clear)
+                                                .aspectRatio(1.0, contentMode: .fit)
+                                                .overlay(
+                                                    GeometryReader { geo in
+                                                        Group {
+                                                            if let img = UIImage(data: photo.imageData) {
+                                                                Image(uiImage: img)
+                                                                    .resizable()
+                                                                    .scaledToFill()
+                                                                    .frame(width: geo.size.width, height: geo.size.height)
+                                                                    .clipped()
+                                                            } else {
+                                                                Color.white.opacity(0.4)
+                                                                    .overlay(
+                                                                        Image(systemName: "photo")
+                                                                            .foregroundStyle(Theme.inkFaded)
+                                                                    )
+                                                            }
+                                                        }
+                                                    }
+                                                )
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                .cardStroke(cornerRadius: 12)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                            }
+                        }
                     }
-                    .listRowBackground(Color.clear)
+                    .padding(16)
+                }
+            }
+        }
+        .paperBackground()
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Photos by Date")
+                    .font(Theme.title(18, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+            }
+        }
+        .fullScreenCover(item: $viewerPhoto) { photo in
+            DishPhotoViewer(photo: photo)
+                .environmentObject(store)
+        }
+    }
+}
+
+struct ProfileDailyMenusListView: View {
+    @Query private var todayEntries: [TodayDishEntry]
+
+    private var groupedMenus: [(date: Date, entries: [TodayDishEntry])] {
+        let activeEntries = todayEntries.filter { $0.dish != nil }
+        let grouped = Dictionary(grouping: activeEntries) { entry in
+            Calendar.current.startOfDay(for: entry.day)
+        }
+        return grouped.map { (date: $0.key, entries: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+
+    var body: some View {
+        Group {
+            if groupedMenus.isEmpty {
+                ContentUnavailableView(
+                    "No daily menus",
+                    systemImage: "sun.max",
+                    description: Text("Plan your daily meals in the Today tab.")
+                )
+            } else {
+                List {
+                    ForEach(groupedMenus, id: \.date) { group in
+                        NavigationLink(value: group.date) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(group.date.formatted(date: .complete, time: .omitted))
+                                    .font(Theme.serif(16, weight: .bold))
+                                    .foregroundStyle(Theme.ink)
+                                
+                                let mealsGrouped = Dictionary(grouping: group.entries) { $0.meal }
+                                let canonical = TodayMeal.allCases.map(\.rawValue)
+                                let sortedMeals = mealsGrouped.map { (meal: $0.key, entries: $0.value) }
+                                    .sorted { a, b in
+                                        let ra = canonical.firstIndex(of: a.meal) ?? Int.max
+                                        let rb = canonical.firstIndex(of: b.meal) ?? Int.max
+                                        if ra != rb { return ra < rb }
+                                        return a.meal < b.meal
+                                    }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    ForEach(sortedMeals, id: \.meal) { mealGroup in
+                                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                            Text(mealGroup.meal.uppercased() + ":")
+                                                .font(Theme.serif(12, weight: .semibold))
+                                                .tracking(1)
+                                                .foregroundStyle(Theme.inkSoft)
+                                            
+                                            let dishNames = mealGroup.entries.compactMap { $0.dish?.name }
+                                            Text(dishNames.joined(separator: ", "))
+                                                .font(Theme.serif(14))
+                                                .foregroundStyle(Theme.ink)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 6)
+                        }
+                        .listRowBackground(Color.clear)
+                    }
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
@@ -163,7 +344,7 @@ struct ProfileGroupDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text(group.name)
+                Text("Daily Menus")
                     .font(Theme.title(18, weight: .bold))
                     .foregroundStyle(Theme.ink)
             }
@@ -176,6 +357,9 @@ struct ProfileView: View {
     private enum ProfileDestination: Hashable {
         case allDishes
         case allGroups
+        case allPhotos
+        case allDailyMenus
+        case statistics
     }
 
     @AppStorage("Lemon.profileDisplayName") private var displayName = ""
@@ -190,8 +374,9 @@ struct ProfileView: View {
     @State private var avatarJPEG: Data? = ProfileAvatarStore.load()
     @State private var avatarPickerItem: PhotosPickerItem?
 
-    private var scheduledSlots: Int {
-        todayEntries.filter { $0.dish != nil }.count
+    private var scheduledDaysCount: Int {
+        let days = todayEntries.filter { $0.dish != nil }.map { Calendar.current.startOfDay(for: $0.day) }
+        return Set(days).count
     }
 
     private var uniqueTagCount: Int {
@@ -216,6 +401,8 @@ struct ProfileView: View {
         avatarJPEG.flatMap({ UIImage(data: $0) }) != nil
     }
 
+
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -228,21 +415,27 @@ struct ProfileView: View {
                 .padding(.bottom, 28)
             }
             .paperBackground()
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
+            .lemonNavigationTitle("Profile")
             .navigationDestination(for: ProfileDestination.self) { dest in
                 switch dest {
-                case .allDishes:
-                    ProfileDishesListView()
-                case .allGroups:
-                    ProfileGroupsListView()
+                case .allDishes, .allGroups:
+                    ProfileDishesGroupsView()
+                case .allPhotos:
+                    ProfilePhotosListView()
+                case .allDailyMenus:
+                    ProfileDailyMenusListView()
+                case .statistics:
+                    ProfileStatisticsView()
                 }
             }
             .navigationDestination(for: Dish.self) { dish in
                 DishDetailView(dish: dish)
             }
             .navigationDestination(for: DishGroup.self) { group in
-                ProfileGroupDetailView(group: group)
+                GroupDetailView(group: group)
+            }
+            .navigationDestination(for: Date.self) { date in
+                DayDetailView(day: date)
             }
         }
     }
@@ -271,44 +464,27 @@ struct ProfileView: View {
     private var profileHeaderCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .center, spacing: 16) {
-                VStack(spacing: 8) {
-                    PhotosPicker(selection: $avatarPickerItem, matching: .images) {
-                        ZStack(alignment: .bottomTrailing) {
-                            avatarCircle
-                            Image(systemName: "camera.circle.fill")
-                                .symbolRenderingMode(.palette)
-                                .foregroundStyle(.white, Theme.ink.opacity(0.55))
-                                .font(.system(size: 26))
-                                .accessibilityHidden(true)
-                        }
-                        .accessibilityLabel("Choose profile photo")
+                PhotosPicker(selection: $avatarPickerItem, matching: .images) {
+                    ZStack(alignment: .bottomTrailing) {
+                        avatarCircle
+                        Image(systemName: "camera.circle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, Theme.ink.opacity(0.55))
+                            .font(.system(size: 26))
+                            .accessibilityHidden(true)
                     }
-                    .buttonStyle(.plain)
-
-                    if hasAvatar {
-                        Button("Remove photo", role: .destructive) {
-                            avatarJPEG = nil
-                            ProfileAvatarStore.save(nil)
-                            avatarPickerItem = nil
-                        }
-                        .font(Theme.hand(12))
-                        .buttonStyle(.plain)
-                    }
+                    .accessibilityLabel("Choose profile photo")
                 }
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Your name")
-                        .font(Theme.hand(12))
-                        .foregroundStyle(Theme.inkFaded)
-                    TextField("e.g. Olivia", text: $displayName)
-                        .font(Theme.dishName(20, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                        .textInputAutocapitalization(.words)
-                }
+                TextField("e.g. Olivia", text: $displayName)
+                    .font(Theme.dishName(20, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                    .textInputAutocapitalization(.words)
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Tagline (optional)")
+                Text("About Me")
                     .font(Theme.hand(12))
                     .foregroundStyle(Theme.inkFaded)
                 TextField("Home cook · meal planner", text: $tagline, axis: .vertical)
@@ -369,8 +545,21 @@ struct ProfileView: View {
                 }
                 .buttonStyle(.plain)
 
-                statTile(title: "Cook photos", value: "\(photos.count)", systemImage: "photo.on.rectangle.angled")
-                statTile(title: "Day plans", value: "\(scheduledSlots)", systemImage: "sun.max")
+                NavigationLink(value: ProfileDestination.allPhotos) {
+                    statTile(title: "Photos", value: "\(photos.count)", systemImage: "photo.on.rectangle.angled")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(value: ProfileDestination.allDailyMenus) {
+                    statTile(title: "Daily Menus", value: "\(scheduledDaysCount)", systemImage: "sun.max")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(value: ProfileDestination.statistics) {
+                    statTile(title: "Statistics", value: "\(todayEntries.filter { $0.dish != nil }.count)", systemImage: "chart.bar")
+                }
+                .buttonStyle(.plain)
+
                 statTile(title: "Tags", value: "\(uniqueTagCount)", systemImage: "tag")
             }
         }
@@ -380,6 +569,8 @@ struct ProfileView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .cardStroke(cornerRadius: 16)
     }
+
+
 
     private func statTile(title: String, value: String, systemImage: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -409,7 +600,7 @@ struct ProfileView: View {
                 .font(Theme.serif(14, weight: .semibold))
                 .foregroundStyle(Theme.ink)
             
-            Text("A personal menu, not a feed.")
+            Text("My Personal Cafes")
                 .font(Theme.serif(12).italic())
                 .foregroundStyle(Theme.inkSoft)
         }
@@ -423,3 +614,158 @@ struct ProfileView: View {
         .environmentObject(AppConfig.shared)
         .environmentObject(DishStore())
 }
+
+struct ProfileStatisticsView: View {
+    @Query private var todayEntries: [TodayDishEntry]
+    
+    private enum StatRange: String, CaseIterable, Identifiable {
+        case week = "Week"
+        case month = "Month"
+        case year = "Year"
+        
+        var id: String { rawValue }
+    }
+    
+    @State private var selectedStatRange: StatRange = .week
+    
+    private var filteredTodayEntries: [TodayDishEntry] {
+        let calendar = Calendar.current
+        let now = Date()
+        let cutoffDate: Date
+        switch selectedStatRange {
+        case .week:
+            cutoffDate = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        case .month:
+            cutoffDate = calendar.date(byAdding: .day, value: -30, to: now) ?? now
+        case .year:
+            cutoffDate = calendar.date(byAdding: .day, value: -365, to: now) ?? now
+        }
+        
+        let startOfCutoff = calendar.startOfDay(for: cutoffDate)
+        return todayEntries.filter { entry in
+            guard entry.dish != nil else { return false }
+            return entry.day >= startOfCutoff
+        }
+    }
+    
+    private var dishStats: [(dish: Dish, count: Int)] {
+        let entries = filteredTodayEntries
+        var frequencies: [UUID: Int] = [:]
+        var dishMap: [UUID: Dish] = [:]
+        
+        for entry in entries {
+            if let dish = entry.dish {
+                frequencies[dish.id, default: 0] += 1
+                dishMap[dish.id] = dish
+            }
+        }
+        
+        return frequencies.map { (id, count) in
+            (dish: dishMap[id]!, count: count)
+        }
+        .sorted { a, b in
+            if a.count != b.count {
+                return a.count > b.count
+            }
+            return a.dish.name.localizedCaseInsensitiveCompare(b.dish.name) == .orderedAscending
+        }
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    Text("STATISTICS RANGE")
+                        .font(Theme.serif(12, weight: .semibold))
+                        .tracking(4)
+                        .foregroundStyle(Theme.inkFaded)
+                    Spacer()
+                    Picker("Range", selection: $selectedStatRange) {
+                        ForEach(StatRange.allCases) { range in
+                            Text(range.rawValue).tag(range)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+                .padding(.horizontal, 4)
+                
+                let stats = dishStats
+                
+                if stats.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Theme.inkFaded)
+                            .padding(.top, 40)
+                        
+                        Text("No dishes logged in this period")
+                            .font(Theme.serif(16).italic())
+                            .foregroundStyle(Theme.inkSoft)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    let maxCount = stats.first?.count ?? 1
+                    
+                    VStack(spacing: 0) {
+                        ForEach(stats, id: \.dish.id) { stat in
+                            NavigationLink(value: stat.dish) {
+                                HStack(spacing: 14) {
+                                    DishIllustrationView(dish: stat.dish, size: 44)
+                                    
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack {
+                                            Text(stat.dish.name)
+                                                .font(Theme.menuDishName(16, weight: .semibold))
+                                                .foregroundStyle(Theme.ink)
+                                                .lineLimit(1)
+                                            
+                                            Spacer()
+                                            
+                                            Text("\(stat.count) \(stat.count == 1 ? "time" : "times")")
+                                                .font(Theme.hand(13))
+                                                .foregroundStyle(Theme.inkSoft)
+                                        }
+                                        
+                                        GeometryReader { geo in
+                                            let progress = CGFloat(stat.count) / CGFloat(maxCount)
+                                            let barWidth = geo.size.width * progress
+                                            Capsule()
+                                                .fill(Theme.highlight)
+                                                .frame(width: min(geo.size.width, max(8, barWidth)))
+                                        }
+                                        .frame(height: 8)
+                                    }
+                                }
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if stat.dish.id != stats.last?.dish.id {
+                                DottedDivider().padding(.horizontal, 4)
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color.white.opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .cardStroke(cornerRadius: 16)
+                }
+            }
+            .padding(20)
+        }
+        .paperBackground()
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Dish Statistics")
+                    .font(Theme.title(18, weight: .bold))
+                    .foregroundStyle(Theme.ink)
+            }
+        }
+    }
+}
+

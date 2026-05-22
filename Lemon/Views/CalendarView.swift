@@ -43,8 +43,8 @@ struct CalendarView: View {
                 Theme.paper.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 16) {
-                        CalendarMasthead()
                         MonthHeader(visibleMonth: $visibleMonth, calendar: calendar)
+                            .padding(.top, 8)
                         WeekdayLabels(calendar: calendar)
                         MonthGrid(
                             visibleMonth: visibleMonth,
@@ -68,7 +68,7 @@ struct CalendarView: View {
                 }
                 .paperBackground()
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .lemonNavigationTitle("Food Calendar")
             .navigationDestination(for: Date.self) { day in
                 DayDetailView(day: day)
             }
@@ -79,26 +79,7 @@ struct CalendarView: View {
     }
 }
 
-// MARK: - Masthead + month header
-
-private struct CalendarMasthead: View {
-    var body: some View {
-        VStack(spacing: 6) {
-            Text("Food Calendar")
-                .font(Theme.title(36))
-                .foregroundStyle(Theme.ink)
-            Text("a day-by-day record of what you ate")
-                .font(Theme.serif(13).italic())
-                .foregroundStyle(Theme.inkSoft)
-            Rectangle()
-                .fill(Theme.ink)
-                .frame(width: 60, height: 1)
-                .padding(.top, 4)
-                .opacity(0.7)
-        }
-        .padding(.top, 16)
-    }
-}
+// MARK: - Month header
 
 private struct MonthHeader: View {
     @Binding var visibleMonth: Date
@@ -398,7 +379,7 @@ private struct EmptyCalendarHint: View {
 
 /// Drill-in view for a single day. Shows the day's Today menu (grouped by
 /// meal) above any photo logs. Tap a thumbnail to open the photo viewer.
-private struct DayDetailView: View {
+struct DayDetailView: View {
     @Query private var photos: [DishPhoto]
     @Query private var todayEntries: [TodayDishEntry]
     @State private var viewingPhoto: DishPhoto?
@@ -407,16 +388,10 @@ private struct DayDetailView: View {
 
     private let calendar = Calendar.current
 
-    /// Photos taken on `day`, grouped by their parent dish. We keep the
-    /// dishes in alphabetical order so the day reads like a menu.
-    private var dishGroups: [(dish: Dish, photos: [DishPhoto])] {
-        let dayPhotos = photos.filter { calendar.isDate($0.effectiveDate, inSameDayAs: day) }
-        let grouped = Dictionary(grouping: dayPhotos) { $0.dish?.id ?? UUID() }
-        return grouped.compactMap { _, list -> (Dish, [DishPhoto])? in
-            guard let dish = list.first?.dish else { return nil }
-            return (dish, list.sorted { $0.effectiveDate < $1.effectiveDate })
-        }
-        .sorted { $0.0.name.localizedCaseInsensitiveCompare($1.0.name) == .orderedAscending }
+    /// Photos taken on `day`, sorted chronologically.
+    private var dayPhotos: [DishPhoto] {
+        photos.filter { calendar.isDate($0.effectiveDate, inSameDayAs: day) }
+            .sorted { $0.effectiveDate < $1.effectiveDate }
     }
 
     /// Today menu entries logged on `day`, grouped by meal name. Meals
@@ -443,7 +418,7 @@ private struct DayDetailView: View {
     }
 
     private var hasAnyContent: Bool {
-        !menuMeals.isEmpty || !dishGroups.isEmpty
+        !menuMeals.isEmpty || !dayPhotos.isEmpty
     }
 
     var body: some View {
@@ -461,15 +436,22 @@ private struct DayDetailView: View {
                         DayMenuCard(meals: menuMeals)
                     }
 
-                    if !dishGroups.isEmpty {
+                    if !dayPhotos.isEmpty {
                         DaySectionLabel(title: "PHOTOS")
 
-                        ForEach(dishGroups, id: \.dish.id) { entry in
-                            DayDishCard(
-                                dish: entry.dish,
-                                photos: entry.photos,
-                                onTapPhoto: { viewingPhoto = $0 }
-                            )
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12),
+                            GridItem(.flexible(), spacing: 12)
+                        ], spacing: 12) {
+                            ForEach(dayPhotos) { photo in
+                                Button {
+                                    viewingPhoto = photo
+                                } label: {
+                                    DayPhotoGridThumb(photo: photo)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
                 }
@@ -593,102 +575,34 @@ private struct DayHeader: View {
     }
 }
 
-private struct DayDishCard: View {
-    let dish: Dish
-    let photos: [DishPhoto]
-    let onTapPhoto: (DishPhoto) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            NavigationLink(value: dish) {
-                HStack(spacing: 12) {
-                    illustration
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(dish.name)
-                            .font(Theme.dishName(14))
-                            .foregroundStyle(Theme.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        if !dish.dishDescription.isEmpty {
-                            Text(dish.dishDescription)
-                                .font(.system(size: 13, weight: .regular, design: .default).italic())
-                                .foregroundStyle(Theme.inkSoft)
-                                .lineLimit(2)
-                        }
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.inkFaded)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(photos) { p in
-                        Button {
-                            onTapPhoto(p)
-                        } label: {
-                            DayPhotoThumb(photo: p)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.45))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .cardStroke(cornerRadius: 16)
-    }
-
-    @ViewBuilder
-    private var illustration: some View {
-        if let data = dish.imageData, let img = UIImage(data: data) {
-            Image(uiImage: img)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 52, height: 52)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .cardStroke(cornerRadius: 10)
-        } else {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.white.opacity(0.5))
-                .frame(width: 52, height: 52)
-                .overlay(
-                    Image(systemName: "fork.knife")
-                        .foregroundStyle(Theme.inkFaded)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .cardStroke(cornerRadius: 10)
-        }
-    }
-}
-
-private struct DayPhotoThumb: View {
+private struct DayPhotoGridThumb: View {
     let photo: DishPhoto
 
     var body: some View {
-        Group {
-            if let img = UIImage(data: photo.imageData) {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Color.white.opacity(0.5)
-                    .overlay(
-                        Image(systemName: "photo")
-                            .foregroundStyle(Theme.inkFaded)
-                    )
-            }
-        }
-        .frame(width: 96, height: 96)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .cardStroke(cornerRadius: 12)
+        Rectangle()
+            .fill(Color.clear)
+            .aspectRatio(1.0, contentMode: .fit)
+            .overlay(
+                GeometryReader { geo in
+                    Group {
+                        if let img = UIImage(data: photo.imageData) {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                        } else {
+                            Color.white.opacity(0.4)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .foregroundStyle(Theme.inkFaded)
+                                )
+                        }
+                    }
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .cardStroke(cornerRadius: 12)
     }
 }
 

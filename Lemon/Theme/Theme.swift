@@ -112,6 +112,23 @@ extension View {
                 .stroke(Theme.ink.opacity(inkOpacity), lineWidth: 1)
         )
     }
+
+    /// Standard Raleway navigation title used by the top-level tab roots
+    /// (Today, Calendar, Profile). Keeps the system back-button label working
+    /// via `navigationTitle(_:)` while visually replacing the inline title
+    /// with a Raleway treatment that matches the rest of the app's typography.
+    func lemonNavigationTitle(_ text: String) -> some View {
+        navigationTitle(text)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(text)
+                        .font(Theme.title(22, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                        .accessibilityAddTraits(.isHeader)
+                }
+            }
+    }
 }
 
 extension String {

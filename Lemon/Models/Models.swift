@@ -9,6 +9,12 @@ final class Dish {
     var imageData: Data?
     var createdAt: Date
 
+    /// The person who created / inspired this dish. Empty string means no attribution.
+    var chefName: String = ""
+    /// A JPEG-compressed portrait of the chef. Stored externally so the SQLite
+    /// database stays small. `nil` when no photo has been set.
+    @Attribute(.externalStorage) var chefAvatarData: Data?
+
     /// The section of the menu this dish belongs to. `nil` means the dish is
     /// shown under "Other dishes" on the menu.
     var group: DishGroup?
@@ -53,7 +59,9 @@ final class Dish {
         ingredientItem: [String] = [],
         steps: [String] = [],
         notes: String = "",
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        chefName: String = "",
+        chefAvatarData: Data? = nil
     ) {
         self.id = id
         self.name = name
@@ -68,6 +76,8 @@ final class Dish {
         self.steps = steps
         self.notes = notes
         self.createdAt = createdAt
+        self.chefName = chefName
+        self.chefAvatarData = chefAvatarData
     }
 }
 
@@ -83,7 +93,36 @@ enum RecipeIngredientFormat {
         return "\(q) \(u) \(n)".trimmingCharacters(in: .whitespaces)
     }
 
+    /// Normalize editable structured fields before saving. This catches common
+    /// manual-entry slips such as putting the whole line in Qty ("6g flour") or
+    /// letting "6g flour" land as qty "6g" + unit "flour".
+    static func normalizedFields(quantity: String, unit: String, name: String) -> (String, String, String) {
+        let q = quantity.trimmingCharacters(in: .whitespacesAndNewlines)
+        let u = unit.trimmingCharacters(in: .whitespacesAndNewlines)
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty || !u.isEmpty || !n.isEmpty else { return ("", "", "") }
+
+        let shouldReparse =
+            n.isEmpty ||
+            q.contains(where: \.isWhitespace) ||
+            u.contains(where: \.isWhitespace) ||
+            splitGluedQuantityUnit(q) != nil
+
+        guard shouldReparse else { return (q, u, n) }
+
+        let parsed = parseImportedOrLegacy(compoundLine(quantity: q, unit: u, name: n))
+        if !parsed.0.isEmpty || !parsed.1.isEmpty || !parsed.2.isEmpty {
+            return parsed
+        }
+        return (q, u, n)
+    }
+
     /// Best-effort split of an imported or legacy line into qty / unit / name.
+    ///
+    /// Handles three common shapes:
+    ///   • "2 cups flour"     → qty "2",    unit "cups", name "flour"
+    ///   • "6g flour"         → qty "6",    unit "g",    name "flour"   (glued)
+    ///   • "Salt to taste"    → qty "",     unit "",     name "Salt to taste"
     static func parseImportedOrLegacy(_ line: String) -> (String, String, String) {
         let t = line.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return ("", "", "") }
@@ -95,9 +134,21 @@ enum RecipeIngredientFormat {
             return ("", "", t)
         }
 
-        var idx = 1
+        var qty = first
         var unit = ""
-        if idx < parts.count {
+        var idx = 1
+
+        if let (q, u) = splitGluedQuantityUnit(first) {
+            // The first token already carries both magnitude and unit
+            // (e.g. "6g", "250ml", "1tbsp"). Take them as-is and let the
+            // rest of the line be the ingredient name.
+            qty = q
+            unit = u
+        } else if idx < parts.count {
+            // Fallback: classic "<qty> <unit> <name>" shape. Adopt the
+            // next token as the unit only when it looks like a unit
+            // (short and lettered) — otherwise leave it as part of the
+            // name.
             let cand = parts[idx]
             let hasLetter = cand.contains(where: \.isLetter)
             if hasLetter, cand.count <= 12 {
@@ -105,14 +156,40 @@ enum RecipeIngredientFormat {
                 idx += 1
             }
         }
+
         let name = parts[idx...].joined(separator: " ")
-        return (first, unit, name)
+        return (qty, unit, name)
     }
 
     private static func startsLikeQuantityToken(_ s: String) -> Bool {
         guard let c = s.first else { return false }
         if c.isNumber { return true }
         return s.contains("/") || s == "½" || s == "¼" || s == "⅓" || s == "⅔"
+    }
+
+    /// If the token begins with a number-like run and ends with a letter run
+    /// (e.g. "6g", "250ml", "1tbsp", "0.5kg", "100克"), returns the split.
+    /// Returns `nil` for plain numbers ("6"), fractions ("1/2"), Unicode
+    /// vulgars ("½"), and ranges ("1-2") — those leave the unit slot for
+    /// the next token, matching the legacy "<qty> <unit> <name>" shape.
+    private static func splitGluedQuantityUnit(_ token: String) -> (qty: String, unit: String)? {
+        var sawDigit = false
+        for i in token.indices {
+            let c = token[i]
+            if c.isLetter {
+                guard sawDigit else { return nil }
+                let qty = String(token[..<i])
+                let unit = String(token[i...])
+                guard !qty.isEmpty, !unit.isEmpty else { return nil }
+                return (qty, unit)
+            } else if c.isNumber {
+                sawDigit = true
+            }
+            // Other characters (".", "/", ",", "-", " ") are tolerated as
+            // part of the quantity prefix; they neither terminate the
+            // numeric run nor count as a letter boundary.
+        }
+        return nil
     }
 }
 
@@ -287,6 +364,7 @@ final class DishGroup {
     var name: String
     var emoji: String?            // single-grapheme emoji logo (preferred)
     var iconName: String          // SF Symbol fallback when emoji is nil/empty
+    var groupDescription: String? // descriptive overview of the group
     var displayOrder: Int         // user-controlled section ordering
     var createdAt: Date
 
@@ -298,6 +376,7 @@ final class DishGroup {
         name: String,
         emoji: String? = nil,
         iconName: String = "folder",
+        groupDescription: String? = nil,
         displayOrder: Int = 0,
         createdAt: Date = .now
     ) {
@@ -305,6 +384,7 @@ final class DishGroup {
         self.name = name
         self.emoji = emoji
         self.iconName = iconName
+        self.groupDescription = groupDescription
         self.displayOrder = displayOrder
         self.createdAt = createdAt
     }

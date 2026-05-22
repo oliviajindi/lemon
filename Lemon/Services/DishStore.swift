@@ -72,6 +72,25 @@ final class DishStore: ObservableObject {
         try? context.save()
     }
 
+    /// Update chef attribution for a dish. Pass `nil` for `avatarImage` to
+    /// keep the existing avatar unchanged; pass a `UIImage` to replace it.
+    /// Passing an empty string for `name` clears the chef credit entirely.
+    func updateChef(_ dish: Dish, name: String, avatarImage: UIImage?) {
+        dish.chefName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let image = avatarImage {
+            // Compress to JPEG at 0.80 quality — good enough for a small avatar.
+            dish.chefAvatarData = image.jpegData(compressionQuality: 0.80)
+        }
+        try? context.save()
+    }
+
+    /// Clears the chef avatar photo only (keeps the name intact).
+    func removeChefAvatar(_ dish: Dish) {
+        dish.chefAvatarData = nil
+        try? context.save()
+    }
+
+
     /// Replace a dish's tags in one save. Normalization trims whitespace,
     /// collapses duplicate tags case-insensitively, and preserves display text.
     func updateTags(_ dish: Dish, tags: [String]) {
@@ -102,12 +121,17 @@ final class DishStore: ObservableObject {
         var legacy: [String] = []
 
         for i in 0..<maxIdx {
-            let q = (i < ingredientQuantities.count ? ingredientQuantities[i] : "")
+            let rawQ = (i < ingredientQuantities.count ? ingredientQuantities[i] : "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let u = (i < ingredientUnits.count ? ingredientUnits[i] : "")
+            let rawU = (i < ingredientUnits.count ? ingredientUnits[i] : "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let it = (i < ingredientItems.count ? ingredientItems[i] : "")
+            let rawItem = (i < ingredientItems.count ? ingredientItems[i] : "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+            let (q, u, it) = RecipeIngredientFormat.normalizedFields(
+                quantity: rawQ,
+                unit: rawU,
+                name: rawItem
+            )
             if q.isEmpty && u.isEmpty && it.isEmpty { continue }
             qOut.append(q)
             uOut.append(u)
@@ -145,6 +169,21 @@ final class DishStore: ObservableObject {
             dishName: trimmedName,
             dishDescription: dish.dishDescription,
             artDirection: artDirection
+        )
+        dish.imageData = data
+        try? context.save()
+    }
+
+    /// Regenerate the menu illustration with Gemini based on a provided photo.
+    func redrawMenuIllustrationBasedOnPhoto(_ dish: Dish, image: UIImage) async throws {
+        statusMessage = "Drawing from your photo…"
+        defer { statusMessage = nil }
+        let trimmedName = dish.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        let data = try await gemini.generateIllustrationBasedOnPhoto(
+            dishName: trimmedName,
+            dishDescription: dish.dishDescription,
+            image: image
         )
         dish.imageData = data
         try? context.save()
@@ -290,6 +329,11 @@ final class DishStore: ObservableObject {
         try? context.save()
     }
 
+    func updateGroupDescription(_ group: DishGroup, description: String?) {
+        group.groupDescription = description?.trimmingCharacters(in: .whitespacesAndNewlines)
+        try? context.save()
+    }
+
     /// Trim to a single grapheme cluster and treat blanks as `nil` so callers
     /// don't have to remember the rule.
     private static func sanitizedEmoji(_ raw: String?) -> String? {
@@ -323,7 +367,7 @@ final class DishStore: ObservableObject {
 
     func identify(text: String, image: UIImage?) async throws -> [DishIdentification] {
         statusMessage = image == nil
-            ? "Asking Gemini to clean up the name…"
+            ? "Gemini is drawing!"
             : "Looking at the photo for dishes…"
         defer { statusMessage = nil }
         return try await gemini.identifyDishes(text: text, image: image)

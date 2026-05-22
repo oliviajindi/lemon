@@ -162,7 +162,7 @@ struct DishDetailView: View {
     private var readOnlyHeader: some View {
         VStack(spacing: 6) {
             Text(dish.name)
-                .font(Theme.dishName(26, weight: .semibold))
+                .font(Theme.title(26, weight: .semibold))
                 .foregroundStyle(Theme.ink)
                 .multilineTextAlignment(.center)
                 .lineLimit(1)
@@ -173,11 +173,47 @@ struct DishDetailView: View {
                     .foregroundStyle(Theme.inkSoft)
                     .multilineTextAlignment(.center)
             }
+            // Chef attribution badge
+            if !dish.chefName.isEmpty {
+                chefBadge
+                    .padding(.top, 4)
+            }
             Text("Added \(dish.createdAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(Theme.hand(13))
                 .foregroundStyle(Theme.inkFaded)
                 .padding(.top, 2)
         }
+    }
+
+    /// A compact pill showing the chef's avatar and name.
+    private var chefBadge: some View {
+        HStack(spacing: 7) {
+            // Avatar circle
+            Group {
+                if let data = dish.chefAvatarData, let img = UIImage(data: data) {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 26, height: 26)
+                        .clipShape(Circle())
+                } else {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 22, weight: .light))
+                        .foregroundStyle(Theme.inkSoft)
+                        .frame(width: 26, height: 26)
+                }
+            }
+            .overlay(Circle().stroke(Theme.ink.opacity(0.18), lineWidth: 1))
+
+            Text(dish.chefName)
+                .font(Theme.hand(13))
+                .foregroundStyle(Theme.inkSoft)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.45))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Theme.ink.opacity(0.18), lineWidth: 1))
     }
 
     @ViewBuilder
@@ -252,6 +288,13 @@ struct DishDetailView: View {
             } label: {
                 Label("Redraw with AI…", systemImage: "wand.and.stars")
             }
+            if !dish.photos.isEmpty {
+                Button {
+                    Task { await performAIRedrawBasedOnPhoto() }
+                } label: {
+                    Label("Regenerate Based On the Photo", systemImage: "wand.and.stars")
+                }
+            }
         } label: {
             Image(systemName: "ellipsis.circle.fill")
                 .font(.system(size: 22, weight: .semibold))
@@ -313,6 +356,22 @@ struct DishDetailView: View {
                 dish,
                 artDirection: hint.isEmpty ? nil : hint
             )
+        } catch {
+            infoAlert = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func performAIRedrawBasedOnPhoto() async {
+        guard let latestPhoto = dish.photos.sorted(by: { $0.effectiveDate > $1.effectiveDate }).first,
+              let uiImage = UIImage(data: latestPhoto.imageData) else {
+            infoAlert = "No photo found in your log to use for redraw."
+            return
+        }
+        isIllustrationWorking = true
+        defer { isIllustrationWorking = false }
+        do {
+            try await store.redrawMenuIllustrationBasedOnPhoto(dish, image: uiImage)
         } catch {
             infoAlert = error.localizedDescription
         }
@@ -438,7 +497,7 @@ private struct RecipeReadOnlyCard: View {
                                     Text("\(index + 1).")
                                         .font(Theme.serif(15, weight: .semibold))
                                         .foregroundStyle(Theme.inkSoft)
-                                        .frame(width: 22, alignment: .leading)
+                                        .frame(width: 28, alignment: .leading)
                                     Text(s)
                                         .font(.system(size: 15, weight: .regular, design: .default))
                                         .foregroundStyle(Theme.ink)
@@ -501,7 +560,7 @@ private struct PhotoLogCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Your photos")
+                Text("Photos")
                     .font(Theme.serif(22, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()

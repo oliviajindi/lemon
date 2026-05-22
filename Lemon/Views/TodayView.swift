@@ -90,7 +90,7 @@ struct TodayView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 36)
-                .padding(.top, 42)
+                .padding(.top, 20)
                 .padding(.bottom, 88)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
@@ -99,8 +99,7 @@ struct TodayView: View {
                     .padding(.bottom, 28)
             }
             .paperBackground()
-            .navigationTitle("Today")
-            .navigationBarTitleDisplayMode(.inline)
+            .lemonNavigationTitle("Today")
             .navigationDestination(for: TodayMealRoute.self) { route in
                 TodayMealDetailView(mealName: route.mealName, day: route.day)
             }
@@ -639,11 +638,6 @@ private struct TodayMealIndexRow: View {
     let mealName: String
     let entries: [TodayDishEntry]
 
-    private var previewNames: String {
-        let names = entries.compactMap { $0.dish?.name }
-        return names.prefix(2).joined(separator: ", ") + (names.count > 2 ? "..." : "")
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
@@ -657,19 +651,23 @@ private struct TodayMealIndexRow: View {
                     .foregroundStyle(Theme.inkFaded)
             }
 
-            Group {
-                if entries.isEmpty {
-                    Text("Tap to choose from your menu")
-                        .font(Theme.serif(12, weight: .light))
-                        .italic()
-                        .foregroundStyle(Theme.inkFaded)
-                } else {
-                    Text(previewNames)
-                        .font(Theme.serif(18))
-                        .foregroundStyle(Theme.inkSoft)
+            if entries.isEmpty {
+                Text("Tap to choose from your menu")
+                    .font(Theme.serif(12, weight: .light))
+                    .italic()
+                    .foregroundStyle(Theme.inkFaded)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(entries) { entry in
+                        if let dish = entry.dish {
+                            Text(dish.name)
+                                .font(Theme.serif(18))
+                                .foregroundStyle(Theme.inkSoft)
+                                .lineLimit(1)
+                        }
+                    }
                 }
             }
-            .lineLimit(2)
         }
         .contentShape(Rectangle())
     }
@@ -803,17 +801,18 @@ private struct TodayMealDetailView: View {
                 isAddingSection = true
                 newSectionFocused = true
             } label: {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .light))
                     Text("Add Course")
-                        .font(Theme.serif(15, weight: .semibold))
-                        .tracking(2)
+                        .font(Theme.serif(13, weight: .light))
+                        .tracking(1)
                     Text("(Appetizer, Main, Dessert…)")
-                        .font(Theme.serif(13).italic())
+                        .font(Theme.serif(11).italic())
                         .tracking(0)
                         .foregroundStyle(Theme.inkFaded)
                 }
-                .foregroundStyle(Theme.ink)
+                .foregroundStyle(Theme.inkSoft)
             }
             .buttonStyle(.plain)
         }
@@ -939,7 +938,7 @@ private struct TodayCourseSection: View {
                                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                                     NavigationLink(value: dish) {
                                         Text(dish.name)
-                                            .font(Theme.dishName(16))
+                                            .font(Theme.dishName(21, weight: .light))
                                             .foregroundStyle(Theme.inkSoft)
                                             .lineLimit(2)
                                     }
@@ -950,7 +949,7 @@ private struct TodayCourseSection: View {
                                         onRemove(entry)
                                     } label: {
                                         Image(systemName: "xmark")
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(.system(size: 8.5, weight: .semibold))
                                             .foregroundStyle(Theme.inkFaded)
                                     }
                                     .buttonStyle(.plain)
@@ -985,7 +984,7 @@ private struct TodayUnsectionedDishes: View {
                             HStack(alignment: .firstTextBaseline, spacing: 10) {
                                 NavigationLink(value: dish) {
                                     Text(dish.name)
-                                        .font(Theme.dishName(16))
+                                        .font(Theme.dishName(21, weight: .light))
                                         .foregroundStyle(Theme.inkSoft)
                                         .lineLimit(2)
                                 }
@@ -996,7 +995,7 @@ private struct TodayUnsectionedDishes: View {
                                     onRemove(entry)
                                 } label: {
                                     Image(systemName: "xmark")
-                                        .font(.system(size: 11, weight: .semibold))
+                                        .font(.system(size: 8.5, weight: .semibold))
                                         .foregroundStyle(Theme.inkFaded)
                                 }
                                 .buttonStyle(.plain)
@@ -1007,13 +1006,14 @@ private struct TodayUnsectionedDishes: View {
             }
 
             Button(action: onAdd) {
-                HStack(spacing: 8) {
+                HStack(spacing: 6) {
                     Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .light))
                     Text("Add Dish")
                 }
-                .font(Theme.serif(15, weight: .semibold))
-                .tracking(2)
-                .foregroundStyle(Theme.ink)
+                .font(Theme.serif(13, weight: .light))
+                .tracking(1)
+                .foregroundStyle(Theme.inkSoft)
             }
             .buttonStyle(.plain)
         }

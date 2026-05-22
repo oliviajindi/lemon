@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		0FE6D116DC43125BAA56DE7D /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6C5CB8F580D56F089AA169 /* TodayView.swift */; };
+		WELC00000000000000000002 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WELC00000000000000000001 /* WelcomeView.swift */; };
+		0FE6D116DC43125BAA56DE7E /* GroupDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CC5DD4C7E9CD3A3F70E62C6 /* GroupDetailView.swift */; };
 		1E52711C10015EDF75BF8223 /* DishCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */; };
 		25B4AD38F4B234E198C99370 /* AddDishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50534020B41FF4DC606D8879 /* AddDishView.swift */; };
 		29C44640950636A2901C9034 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068D72F9D10EF09051C3C045 /* SettingsView.swift */; };
@@ -59,9 +61,11 @@
 		545A041462A83D30DF15CDDC /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		59C41C131B2FD0DF02B49658 /* DishPhotoViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishPhotoViewer.swift; sourceTree = "<group>"; };
 		5D6C5CB8F580D56F089AA169 /* TodayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		WELC00000000000000000001 /* WelcomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		7CB4A1BDF3744DA0C5000E48 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		893DE56EC7B936527E674F21 /* FlowLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		8E9D0C1B2A38475640312F0E1 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		9CC5DD4C7E9CD3A3F70E62C6 /* GroupDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupDetailView.swift; sourceTree = "<group>"; };
 		9F3D9F36963A016D7782EFE3 /* LemonApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LemonApp.swift; sourceTree = "<group>"; };
 		A8F911CDEE6AF99EB0705803 /* AppConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
 		AC38E1E69C7860E372EFB497 /* Models.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -161,6 +165,7 @@
 				59C41C131B2FD0DF02B49658 /* DishPhotoViewer.swift */,
 				893DE56EC7B936527E674F21 /* FlowLayout.swift */,
 				24AFA1C738CB9C9920E395E3 /* GroupPicker.swift */,
+				9CC5DD4C7E9CD3A3F70E62C6 /* GroupDetailView.swift */,
 				470C57DA661BF84180D12443 /* MenuView.swift */,
 				8E9D0C1B2A38475640312F0E1 /* ProfileView.swift */,
 				09B6EF35DDE43CFF81D94613 /* RecipeEditorSheet.swift */,
@@ -169,6 +174,7 @@
 				068D72F9D10EF09051C3C045 /* SettingsView.swift */,
 				EA4555D95837377851836C66 /* TaggedDishesView.swift */,
 				5D6C5CB8F580D56F089AA169 /* TodayView.swift */,
+				WELC00000000000000000001 /* WelcomeView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -302,6 +308,7 @@
 				F7E3D1C09B8A675948392817 /* DishEditView.swift in Sources */,
 				51E1821F32C6349D0F50B9D6 /* DishPhotoViewer.swift in Sources */,
 				549BC0588EE71E1CD604E700 /* FlowLayout.swift in Sources */,
+				0FE6D116DC43125BAA56DE7E /* GroupDetailView.swift in Sources */,
 				B569CD7C6014362FE20B1040 /* GroupPicker.swift in Sources */,
 				7907CEAC88335B1C99996905 /* MenuView.swift in Sources */,
 				7F8E9D0C1B2A38475640312F /* ProfileView.swift in Sources */,
@@ -311,6 +318,7 @@
 				29C44640950636A2901C9034 /* SettingsView.swift in Sources */,
 				D6D589C089DF3870BA337D7B /* TaggedDishesView.swift in Sources */,
 				0FE6D116DC43125BAA56DE7D /* TodayView.swift in Sources */,
+				WELC00000000000000000002 /* WelcomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

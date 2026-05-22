@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Foundation
+import PhotosUI
 
 /// Full-screen editor for a dish. Use `scope` to show only **details** (name +
 /// description), only **recipe**, or **everything** (tags and group are
@@ -21,6 +22,11 @@ struct DishEditView: View {
     @State private var draftName: String = ""
     @State private var draftDescription: String = ""
     @State private var groupSelection: DishGroup?
+
+    // Chef attribution
+    @State private var draftChefName: String = ""
+    @State private var draftChefAvatarImage: UIImage? = nil
+    @State private var chefAvatarPickerItem: PhotosPickerItem? = nil
 
     var body: some View {
         NavigationStack {
@@ -53,6 +59,9 @@ struct DishEditView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.ink.opacity(0.2), lineWidth: 1))
                             }
+
+                            // Chef attribution editor
+                            chefEditorSection
                         }
 
                         if showsTagsAndGroup {
@@ -92,6 +101,18 @@ struct DishEditView: View {
                 draftName = dish.name
                 draftDescription = dish.dishDescription
                 groupSelection = dish.group
+                draftChefName = dish.chefName
+                if let data = dish.chefAvatarData {
+                    draftChefAvatarImage = UIImage(data: data)
+                }
+            }
+            .onChange(of: chefAvatarPickerItem) { _, item in
+                Task {
+                    if let data = try? await item?.loadTransferable(type: Data.self),
+                       let img = UIImage(data: data) {
+                        draftChefAvatarImage = img
+                    }
+                }
             }
         }
     }
@@ -121,14 +142,88 @@ struct DishEditView: View {
         case .full:
             store.updateDishDetails(dish, name: draftName, description: draftDescription)
             store.setGroup(groupSelection, for: dish)
+            store.updateChef(dish, name: draftChefName, avatarImage: draftChefAvatarImage)
         case .detailsOnly:
             store.updateDishDetails(dish, name: draftName, description: draftDescription)
+            store.updateChef(dish, name: draftChefName, avatarImage: draftChefAvatarImage)
         case .recipeOnly:
             break
         }
         dismiss()
     }
+
+    // MARK: - Chef attribution editor section
+
+    private var chefEditorSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Chef")
+                .font(Theme.hand(13))
+                .foregroundStyle(Theme.inkSoft)
+
+            HStack(alignment: .center, spacing: 14) {
+                // Circular avatar picker
+                PhotosPicker(
+                    selection: $chefAvatarPickerItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.7))
+                            .frame(width: 64, height: 64)
+                        if let img = draftChefAvatarImage {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 64, height: 64)
+                                .clipShape(Circle())
+                        } else {
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 32, weight: .light))
+                                .foregroundStyle(Theme.inkFaded)
+                        }
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Pick chef avatar photo")
+
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Chef name (optional)", text: $draftChefName)
+                        .font(Theme.serif(15))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(Color.white.opacity(0.55))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.ink.opacity(0.2), lineWidth: 1))
+
+                    if draftChefAvatarImage != nil {
+                        Button {
+                            draftChefAvatarImage = nil
+                            chefAvatarPickerItem = nil
+                            // Also clear from the dish immediately so it reflects on cancel
+                            dish.chefAvatarData = nil
+                        } label: {
+                            Text("Remove photo")
+                                .font(Theme.hand(12))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.ink.opacity(0.18), lineWidth: 1))
+    }
 }
+
 
 // MARK: - Tags (edit)
 
@@ -160,10 +255,6 @@ struct DishTagEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Tags")
-                .font(Theme.hand(13))
-                .foregroundStyle(Theme.inkSoft)
-
             FlowLayout(spacing: 6, rowSpacing: 6) {
                 if !dish.tags.isEmpty {
                     ForEach(dish.tags, id: \.self) { tag in
@@ -664,7 +755,8 @@ private struct IngredientListEditor: View {
         let u = draftUnit.trimmingCharacters(in: .whitespacesAndNewlines)
         let n = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty || !u.isEmpty || !n.isEmpty else { return }
-        rows.append(IngredientLineRow(quantity: q, unit: u, name: n))
+        let normalized = RecipeIngredientFormat.normalizedFields(quantity: q, unit: u, name: n)
+        rows.append(IngredientLineRow(quantity: normalized.0, unit: normalized.1, name: normalized.2))
         draftQty = ""
         draftUnit = ""
         draftName = ""

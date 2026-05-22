@@ -57,13 +57,34 @@ struct LemonApp: App {
         LegacyDefaultsMigration.runIfNeeded()
     }
 
+    @State private var showWelcome = true
+
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environmentObject(config)
-                .environmentObject(store)
-                .tint(Theme.ink)
-                .preferredColorScheme(.light)
+            Group {
+                if showWelcome {
+                    WelcomeView {
+                        withAnimation(.easeInOut(duration: 0.4)) {
+                            showWelcome = false
+                        }
+                    }
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            if showWelcome {
+                                withAnimation(.easeInOut(duration: 0.4)) {
+                                    showWelcome = false
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    RootView()
+                }
+            }
+            .environmentObject(config)
+            .environmentObject(store)
+            .tint(Theme.ink)
+            .preferredColorScheme(ColorScheme.light)
         }
         .modelContainer(DishStore.sharedContainer)
     }

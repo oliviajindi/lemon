@@ -75,6 +75,9 @@ struct CalendarView: View {
             .navigationDestination(for: Dish.self) { dish in
                 DishDetailView(dish: dish)
             }
+            .navigationDestination(for: Chef.self) { chef in
+                ChefDishesView(chef: chef)
+            }
         }
     }
 }

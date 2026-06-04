@@ -13,64 +13,64 @@ struct DishDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var dish: Dish
 
-    @State private var confirmingDelete = false
     @State private var showingDetailsEditor = false
-    @State private var showingRecipeEditor = false
-    @State private var groupSelection: DishGroup?
 
     @State private var replacePhotoItem: PhotosPickerItem?
     @State private var showingRedrawSheet = false
     @State private var redrawNotes = ""
     @State private var isIllustrationWorking = false
     @State private var infoAlert: String?
+    @State private var showingRecipeAssistant = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                illustration
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(spacing: 20) {
+                    illustration
 
-                headerBlock
+                    metadataBar
 
-                DishTagEditor(dish: dish)
-                    .padding(.top, 6)
+                    RecipeReadOnlyCard(dish: dish, onAdd: { showingDetailsEditor = true })
+                        .padding(.top, 4)
 
-                groupBlock
-                    .padding(.top, 8)
-
-                RecipeReadOnlyCard(dish: dish, onEdit: { showingRecipeEditor = true })
-                    .padding(.top, 8)
-
-                PhotoLogCard(dish: dish)
+                    PhotoLogCard(dish: dish)
+                    
+                    addedDateBlock
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
+                }
+                .padding(20)
             }
-            .padding(20)
+
+            assistantFAB
+                .padding(.trailing, 22)
+                .padding(.bottom, 28)
         }
         .paperBackground()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button(role: .destructive) {
-                    confirmingDelete = true
+                Button {
+                    showingDetailsEditor = true
                 } label: {
-                    Image(systemName: "trash")
+                    Image(systemName: "pencil")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(Theme.ink)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Edit Dish")
             }
         }
         .fullScreenCover(isPresented: $showingDetailsEditor) {
-            DishEditView(dish: dish, scope: .detailsOnly)
-                .environmentObject(store)
-        }
-        .fullScreenCover(isPresented: $showingRecipeEditor) {
-            DishEditView(dish: dish, scope: .recipeOnly)
-                .environmentObject(store)
-        }
-        .confirmationDialog("Remove this dish?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-            Button("Remove", role: .destructive) {
-                store.deleteDish(dish)
+            DishEditView(dish: dish, scope: .full, onDelete: {
                 dismiss()
-            }
-            Button("Cancel", role: .cancel) {}
+            })
+            .environmentObject(store)
         }
         .sheet(isPresented: $showingRedrawSheet) {
             redrawIllustrationSheet
+        }
+        .sheet(isPresented: $showingRecipeAssistant) {
+            RecipeAssistantSheet(mode: .copilot(dish: dish))
         }
         .alert("Notice", isPresented: Binding(
             get: { infoAlert != nil },
@@ -80,42 +80,98 @@ struct DishDetailView: View {
         } message: {
             Text(infoAlert ?? "")
         }
-        .onAppear {
-            groupSelection = dish.group
-        }
-        .onChange(of: dish.group) { _, newValue in
-            groupSelection = newValue
-        }
     }
 
-    private var headerBlock: some View {
-        HStack(alignment: .top, spacing: 10) {
-            readOnlyHeader
-                .frame(maxWidth: .infinity)
-            Button {
-                showingDetailsEditor = true
-            } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 22, weight: .medium))
+    private var metadataBar: some View {
+        VStack(alignment: .center, spacing: 14) {
+            // Line 1: Dish Name
+            Text(dish.name)
+                .font(Theme.title(28, weight: .semibold))
+                .foregroundStyle(Theme.ink)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
+            
+            // Line 2: Description
+            if !dish.dishDescription.isEmpty {
+                Text(dish.dishDescription)
+                    .font(.system(size: 15, weight: .regular, design: .default).italic())
                     .foregroundStyle(Theme.inkSoft)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(3)
+            } else {
+                Text("No description yet.")
+                    .font(.system(size: 14, weight: .light, design: .default).italic())
+                    .foregroundStyle(Theme.inkFaded)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.plain)
-            .padding(.top, 2)
-            .accessibilityLabel("Edit name and description")
+            
+            // Line 3: Chef + Group + Tags
+            FlowLayout(spacing: 8, rowSpacing: 8, alignment: .center) {
+                // Chefs
+                if !dish.chefs.isEmpty {
+                    ForEach(dish.chefs) { chef in
+                        HStack(spacing: 5) {
+                            ChefAvatarView(chef: chef, size: 18)
+                            Text(chef.name)
+                                .font(Theme.hand(13))
+                                .foregroundStyle(Theme.inkSoft)
+                        }
+                    }
+                } else {
+                    Text("No Chef")
+                        .font(Theme.hand(13).italic())
+                        .foregroundStyle(Theme.inkFaded)
+                }
+                
+                Text("•")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.inkFaded)
+                
+                // Group
+                if let group = dish.group {
+                    HStack(spacing: 5) {
+                        if let emoji = group.emoji, !emoji.isEmpty {
+                            Text(emoji)
+                                .font(.system(size: 13))
+                        } else {
+                            Image(systemName: "folder")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Theme.inkSoft)
+                        }
+                        Text(group.name)
+                            .font(Theme.serif(13, weight: .semibold))
+                            .foregroundStyle(Theme.inkSoft)
+                    }
+                } else {
+                    Text("No Group")
+                        .font(Theme.serif(13).italic())
+                        .foregroundStyle(Theme.inkFaded)
+                }
+                
+                // Tags
+                if !dish.tags.isEmpty {
+                    Text("•")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.inkFaded)
+                    
+                    ForEach(dish.tags, id: \.self) { tag in
+                        Text("#\(tag)")
+                            .font(Theme.serif(13))
+                            .foregroundStyle(Theme.inkSoft)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    private var groupBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Group")
-                .font(Theme.hand(13))
-                .foregroundStyle(Theme.inkSoft)
-            GroupPicker(selection: $groupSelection)
-                .onChange(of: groupSelection) { _, newValue in
-                    store.setGroup(newValue, for: dish)
-                }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private var addedDateBlock: some View {
+        Text("Added \(dish.createdAt.formatted(date: .abbreviated, time: .omitted))")
+            .font(Theme.hand(13))
+            .foregroundStyle(Theme.inkFaded)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var redrawIllustrationSheet: some View {
@@ -173,47 +229,38 @@ struct DishDetailView: View {
                     .foregroundStyle(Theme.inkSoft)
                     .multilineTextAlignment(.center)
             }
-            // Chef attribution badge
-            if !dish.chefName.isEmpty {
-                chefBadge
-                    .padding(.top, 4)
-            }
             Text("Added \(dish.createdAt.formatted(date: .abbreviated, time: .omitted))")
                 .font(Theme.hand(13))
                 .foregroundStyle(Theme.inkFaded)
                 .padding(.top, 2)
+            // Chef attribution badges
+            if !dish.chefs.isEmpty {
+                FlowLayout(spacing: 8, rowSpacing: 8, alignment: .center) {
+                    ForEach(dish.chefs) { chef in
+                        chefBadge(chef)
+                    }
+                }
+                .padding(.top, 4)
+            }
         }
     }
 
-    /// A compact pill showing the chef's avatar and name.
-    private var chefBadge: some View {
-        HStack(spacing: 7) {
-            // Avatar circle
-            Group {
-                if let data = dish.chefAvatarData, let img = UIImage(data: data) {
-                    Image(uiImage: img)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 26, height: 26)
-                        .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 22, weight: .light))
-                        .foregroundStyle(Theme.inkSoft)
-                        .frame(width: 26, height: 26)
-                }
-            }
-            .overlay(Circle().stroke(Theme.ink.opacity(0.18), lineWidth: 1))
+    private func chefBadge(_ chef: Chef) -> some View {
+        NavigationLink(value: chef) {
+            HStack(spacing: 7) {
+                ChefAvatarView(chef: chef, size: 26)
 
-            Text(dish.chefName)
-                .font(Theme.hand(13))
-                .foregroundStyle(Theme.inkSoft)
+                Text(chef.name)
+                    .font(Theme.hand(13))
+                    .foregroundStyle(Theme.inkSoft)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.45))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Theme.ink.opacity(0.18), lineWidth: 1))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color.white.opacity(0.45))
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(Theme.ink.opacity(0.18), lineWidth: 1))
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -376,13 +423,29 @@ struct DishDetailView: View {
             infoAlert = error.localizedDescription
         }
     }
+
+    private var assistantFAB: some View {
+        Button {
+            showingRecipeAssistant = true
+        } label: {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.white)
+                .frame(width: 58, height: 58)
+                .background(Circle().fill(Theme.ink))
+                .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1))
+                .shadow(color: Theme.ink.opacity(0.22), radius: 10, x: 0, y: 5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open Sous Chef assistant")
+    }
 }
 
 // MARK: - Read-only recipe
 
 private struct RecipeReadOnlyCard: View {
     let dish: Dish
-    let onEdit: () -> Void
+    let onAdd: () -> Void
 
     private var ingredientRows: [(q: String, u: String, n: String)] {
         let n = max(dish.ingredientQty.count, dish.ingredientUnit.count, dish.ingredientItem.count)
@@ -423,18 +486,11 @@ private struct RecipeReadOnlyCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center) {
                 Text("Recipe")
                     .font(Theme.serif(22, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
-                Button(action: onEdit) {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Edit recipe")
             }
 
             Rectangle()
@@ -552,32 +608,15 @@ private struct PhotoLogCard: View {
     @EnvironmentObject private var store: DishStore
     let dish: Dish
 
-    @State private var isLoading = false
-    @State private var selectedItems: [PhotosPickerItem] = []
     @State private var viewerPhoto: DishPhoto?
-    @State private var photoToDelete: DishPhoto?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(alignment: .center) {
                 Text("Photos")
                     .font(Theme.serif(22, weight: .semibold))
                     .foregroundStyle(Theme.ink)
                 Spacer()
-                if !dish.photos.isEmpty {
-                    PhotosPicker(
-                        selection: $selectedItems,
-                        maxSelectionCount: 8,
-                        matching: .images,
-                        photoLibrary: .shared()
-                    ) {
-                        Text("Add")
-                            .font(Theme.hand(14))
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Theme.ink)
-                    }
-                    .disabled(isLoading)
-                }
             }
 
             Rectangle()
@@ -586,54 +625,20 @@ private struct PhotoLogCard: View {
                 .opacity(0.6)
 
             if dish.photos.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Snap the real thing when you cook this — caloric honesty over menu fantasy.")
-                        .font(Theme.serif(14).italic())
-                        .foregroundStyle(Theme.inkSoft)
-
-                    PhotosPicker(
-                        selection: $selectedItems,
-                        maxSelectionCount: 8,
-                        matching: .images,
-                        photoLibrary: .shared()
-                    ) {
-                        Label("Add photos from library", systemImage: "photo.on.rectangle.angled")
-                            .font(Theme.hand(14))
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Theme.ink)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(0.45))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Theme.ink.opacity(0.25), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isLoading)
-                }
+                Text("Snap the real thing when you cook this — caloric honesty over menu fantasy. Tap the pencil to add photos.")
+                    .font(Theme.serif(14).italic())
+                    .foregroundStyle(Theme.inkSoft)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(dish.photos) { photo in
                             PhotoLogThumbnailCell(
                                 photo: photo,
-                                onOpen: { viewerPhoto = photo },
-                                onRemove: { photoToDelete = photo }
+                                onOpen: { viewerPhoto = photo }
                             )
                         }
                     }
                     .padding(.vertical, 2)
-                }
-            }
-
-            if isLoading {
-                HStack(spacing: 8) {
-                    ProgressView()
-                    Text("Saving photos…")
-                        .font(Theme.hand(13))
-                        .foregroundStyle(Theme.inkSoft)
                 }
             }
         }
@@ -646,42 +651,6 @@ private struct PhotoLogCard: View {
             DishPhotoViewer(photo: photo)
                 .environmentObject(store)
         }
-        .confirmationDialog(
-            "Remove this photo from this dish?",
-            isPresented: Binding(
-                get: { photoToDelete != nil },
-                set: { if !$0 { photoToDelete = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button("Remove Photo", role: .destructive) {
-                if let p = photoToDelete {
-                    store.deletePhoto(p)
-                }
-                photoToDelete = nil
-            }
-            Button("Cancel", role: .cancel) { photoToDelete = nil }
-        }
-        .onChange(of: selectedItems) { _, newItems in
-            guard !newItems.isEmpty else { return }
-            Task { await ingest(newItems) }
-        }
-    }
-
-    private func ingest(_ items: [PhotosPickerItem]) async {
-        isLoading = true
-        defer {
-            isLoading = false
-            selectedItems = []
-        }
-        for item in items {
-            guard
-                let data = try? await item.loadTransferable(type: Data.self),
-                let img = UIImage(data: data)
-            else { continue }
-            let takenAt = data.exifCaptureDate()
-            store.addPhoto(img, takenAt: takenAt, to: dish)
-        }
     }
 }
 
@@ -689,29 +658,12 @@ private struct PhotoLogCard: View {
 private struct PhotoLogThumbnailCell: View {
     let photo: DishPhoto
     let onOpen: () -> Void
-    let onRemove: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Button(action: onOpen) {
-                PhotoThumbnail(photo: photo)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: onRemove) {
-                removeBadge
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove photo")
+        Button(action: onOpen) {
+            PhotoThumbnail(photo: photo)
         }
-    }
-
-    private var removeBadge: some View {
-        Image(systemName: "xmark.circle.fill")
-            .font(.system(size: 18, weight: .semibold))
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.white, Theme.ink.opacity(0.7))
-            .padding(4)
+        .buttonStyle(.plain)
     }
 }
 

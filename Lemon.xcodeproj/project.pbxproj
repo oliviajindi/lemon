@@ -8,12 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		0FE6D116DC43125BAA56DE7D /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D6C5CB8F580D56F089AA169 /* TodayView.swift */; };
-		WELC00000000000000000002 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WELC00000000000000000001 /* WelcomeView.swift */; };
+		CHEF00000000000000000002 /* ChefDishesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHEF00000000000000000001 /* ChefDishesView.swift */; };
+		STOR00000000000000000002 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = STOR00000000000000000001 /* LaunchScreen.storyboard */; };
 		0FE6D116DC43125BAA56DE7E /* GroupDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CC5DD4C7E9CD3A3F70E62C6 /* GroupDetailView.swift */; };
 		1E52711C10015EDF75BF8223 /* DishCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */; };
-		25B4AD38F4B234E198C99370 /* AddDishView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50534020B41FF4DC606D8879 /* AddDishView.swift */; };
 		29C44640950636A2901C9034 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 068D72F9D10EF09051C3C045 /* SettingsView.swift */; };
 		3B1CCF9AD52BEC57E40EF4F4 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A848EDC56979334846A942E /* CalendarView.swift */; };
+		3C4845465649455753434846 /* ChefViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 434846564945575343484657 /* ChefViews.swift */; };
 		40DB9DF7FFB2EDE178C7F5DD /* LemonApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F3D9F36963A016D7782EFE3 /* LemonApp.swift */; };
 		4B9EF70C4440955E55A44203 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC38E1E69C7860E372EFB497 /* Models.swift */; };
 		4C9E968F24FFE9804207767F /* Raleway.ttf in Resources */ = {isa = PBXBuildFile; fileRef = FACA1AB05E33936BE80CF7A7 /* Raleway.ttf */; };
@@ -41,6 +42,7 @@
 		F7E3D1C09B8A675948392817 /* DishEditView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D4F2A11C9B074E8F2A0041 /* DishEditView.swift */; };
 		FA13006EB396239A79FD6304 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33EF27AAB76650F99C543CA7 /* Foundation.framework */; };
 		FE123904C4DF1EFEFC770293 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 545A041462A83D30DF15CDDC /* RootView.swift */; };
+		TMSV0000000000000000001B /* TodayMenuShareViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = TMSV0000000000000000001A /* TodayMenuShareViews.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -55,13 +57,14 @@
 		33EF27AAB76650F99C543CA7 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		405905A703C43809865369AE /* GoogleService-Info.plist */ = {isa = PBXFileReference; explicitFileType = text.plist; lastKnownFileType = text.plist; name = "GoogleService-Info.plist"; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		4250330C89830A827095852B /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		434846564945575343484657 /* ChefViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChefViews.swift; sourceTree = "<group>"; };
 		470C57DA661BF84180D12443 /* MenuView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MenuView.swift; sourceTree = "<group>"; };
 		4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishCardView.swift; sourceTree = "<group>"; };
-		50534020B41FF4DC606D8879 /* AddDishView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AddDishView.swift; sourceTree = "<group>"; };
 		545A041462A83D30DF15CDDC /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		59C41C131B2FD0DF02B49658 /* DishPhotoViewer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DishPhotoViewer.swift; sourceTree = "<group>"; };
 		5D6C5CB8F580D56F089AA169 /* TodayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
-		WELC00000000000000000001 /* WelcomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		CHEF00000000000000000001 /* ChefDishesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChefDishesView.swift; sourceTree = "<group>"; };
+		STOR00000000000000000001 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		7CB4A1BDF3744DA0C5000E48 /* Theme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		893DE56EC7B936527E674F21 /* FlowLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FlowLayout.swift; sourceTree = "<group>"; };
 		8E9D0C1B2A38475640312F0E1 /* ProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
@@ -77,6 +80,7 @@
 		ED35C552D99D0B89E486C33F /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		FACA1AB05E33936BE80CF7A7 /* Raleway.ttf */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = file; path = Raleway.ttf; sourceTree = "<group>"; };
 		FC5FBC58995855B9FBE9CFBC /* GeminiService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
+		TMSV0000000000000000001A /* TodayMenuShareViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodayMenuShareViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -157,8 +161,8 @@
 		9CC5DD4C7E9CD3A3F70E62C5 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				50534020B41FF4DC606D8879 /* AddDishView.swift */,
 				2A848EDC56979334846A942E /* CalendarView.swift */,
+				434846564945575343484657 /* ChefViews.swift */,
 				4FCD1B85B1C34F0B4F1544C0 /* DishCardView.swift */,
 				05073E100725819E0585F50F /* DishDetailView.swift */,
 				E8D4F2A11C9B074E8F2A0041 /* DishEditView.swift */,
@@ -174,7 +178,8 @@
 				068D72F9D10EF09051C3C045 /* SettingsView.swift */,
 				EA4555D95837377851836C66 /* TaggedDishesView.swift */,
 				5D6C5CB8F580D56F089AA169 /* TodayView.swift */,
-				WELC00000000000000000001 /* WelcomeView.swift */,
+				TMSV0000000000000000001A /* TodayMenuShareViews.swift */,
+				CHEF00000000000000000001 /* ChefDishesView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -193,6 +198,7 @@
 			children = (
 				9F3D9F36963A016D7782EFE3 /* LemonApp.swift */,
 				ED35C552D99D0B89E486C33F /* Info.plist */,
+				STOR00000000000000000001 /* LaunchScreen.storyboard */,
 				B8F45B5426E0264D66650326 /* Theme */,
 				35C74322E82780D37C385B50 /* Models */,
 				71170DDB55197EE62F3D8E6C /* Services */,
@@ -284,6 +290,7 @@
 				AFFAA72D6A4671D4489BCD26 /* Assets.xcassets in Resources */,
 				E65956233BA64A07AA552FC1 /* Preview Assets.xcassets in Resources */,
 				62FD58471E481A9DB4702B58 /* GoogleService-Info.plist in Resources */,
+				STOR00000000000000000002 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,8 +308,8 @@
 				D153247B40C28C9287CB0F54 /* DishStore.swift in Sources */,
 				9A6114630B5349094C7C437D /* GeminiService.swift in Sources */,
 				8516D89FB83395BF5D1EDE56 /* ImageMetadata.swift in Sources */,
-				25B4AD38F4B234E198C99370 /* AddDishView.swift in Sources */,
 				3B1CCF9AD52BEC57E40EF4F4 /* CalendarView.swift in Sources */,
+				3C4845465649455753434846 /* ChefViews.swift in Sources */,
 				1E52711C10015EDF75BF8223 /* DishCardView.swift in Sources */,
 				81EE67D0F1F776650E9D2C97 /* DishDetailView.swift in Sources */,
 				F7E3D1C09B8A675948392817 /* DishEditView.swift in Sources */,
@@ -318,7 +325,8 @@
 				29C44640950636A2901C9034 /* SettingsView.swift in Sources */,
 				D6D589C089DF3870BA337D7B /* TaggedDishesView.swift in Sources */,
 				0FE6D116DC43125BAA56DE7D /* TodayView.swift in Sources */,
-				WELC00000000000000000002 /* WelcomeView.swift in Sources */,
+				TMSV0000000000000000001B /* TodayMenuShareViews.swift in Sources */,
+				CHEF00000000000000000002 /* ChefDishesView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

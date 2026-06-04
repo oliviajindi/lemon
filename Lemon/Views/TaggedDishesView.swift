@@ -56,6 +56,6 @@ struct TaggedDishesView: View {
     }
 
     private func countLabel(_ n: Int) -> String {
-        n == 1 ? "1 dish" : "\(n) dishes"
+        n == 1 ? "1 Dish" : "\(n) Dishes"
     }
 }

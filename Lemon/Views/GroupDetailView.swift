@@ -6,6 +6,7 @@ import SwiftData
 /// and description here rather than on the main page.
 struct GroupDetailView: View {
     @EnvironmentObject private var store: DishStore
+    @Environment(\.dismiss) private var dismiss
     @Bindable var group: DishGroup
 
     @State private var isEditing = false
@@ -13,6 +14,8 @@ struct GroupDetailView: View {
     @State private var draftDescription = ""
     @State private var draftEmoji: String? = nil
     @State private var showingEmojiPicker = false
+    @State private var showingDeleteConfirmation = false
+    @State private var searchText = ""
 
     var body: some View {
         ScrollView {
@@ -98,6 +101,28 @@ struct GroupDetailView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 8)
+
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "trash")
+                                Text("Delete Group")
+                            }
+                            .font(Theme.serif(15, weight: .semibold))
+                            .foregroundStyle(Color.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.red.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.red.opacity(0.25), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 12)
+                        .padding(.horizontal, 8)
                     } else {
                         // View mode
                         Text(group.name)
@@ -119,6 +144,40 @@ struct GroupDetailView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
+
+                if !isEditing {
+                    // Search bar below the title / description part
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Theme.inkFaded)
+                        
+                        TextField("Search dishes in this group…", text: $searchText)
+                            .font(Theme.serif(15))
+                            .textInputAutocapitalization(.never)
+                            .submitLabel(.search)
+                        
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Theme.inkSoft)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.white.opacity(0.55))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Theme.ink.opacity(0.18), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 8)
+                }
 
                 DottedDivider()
                     .padding(.vertical, 4)
@@ -142,17 +201,25 @@ struct GroupDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 24)
                     } else {
-                        VStack(spacing: 0) {
-                            let sortedDishes = group.dishes.sorted(by: { $0.createdAt > $1.createdAt })
-                            ForEach(sortedDishes) { dish in
-                                NavigationLink(value: dish) {
-                                    DishCardView(dish: dish)
-                                }
-                                .buttonStyle(.plain)
+                        let dishesToShow = filteredDishes
+                        if dishesToShow.isEmpty {
+                            Text("No dishes match \"\(searchText)\".")
+                                .font(Theme.serif(14).italic())
+                                .foregroundStyle(Theme.inkFaded)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 24)
+                        } else {
+                            VStack(spacing: 0) {
+                                ForEach(dishesToShow) { dish in
+                                    NavigationLink(value: dish) {
+                                        DishCardView(dish: dish)
+                                    }
+                                    .buttonStyle(.plain)
 
-                                if dish != sortedDishes.last {
-                                    DottedDivider()
-                                        .padding(.horizontal, 4)
+                                    if dish != dishesToShow.last {
+                                        DottedDivider()
+                                            .padding(.horizontal, 4)
+                                    }
                                 }
                             }
                         }
@@ -192,6 +259,14 @@ struct GroupDetailView: View {
             }
             .presentationDetents([.medium, .large])
         }
+        .alert("Delete Group?", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                deleteGroup()
+            }
+        } message: {
+            Text("Are you sure you want to delete this group? The dishes won't be deleted.")
+        }
     }
 
     private func enterEditing() {
@@ -205,5 +280,19 @@ struct GroupDetailView: View {
         store.updateGroup(group, name: draftName, emoji: draftEmoji)
         store.updateGroupDescription(group, description: draftDescription.isEmpty ? nil : draftDescription)
         isEditing = false
+    }
+
+    private func deleteGroup() {
+        store.deleteGroup(group)
+        dismiss()
+    }
+
+    private var filteredDishes: [Dish] {
+        let sorted = group.dishes.sorted(by: { $0.createdAt > $1.createdAt })
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty {
+            return sorted
+        }
+        return sorted.filter { $0.name.lowercased().contains(query) }
     }
 }

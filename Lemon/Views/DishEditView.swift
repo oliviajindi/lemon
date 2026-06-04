@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import Foundation
 import PhotosUI
+import UIKit
 
 /// Full-screen editor for a dish. Use `scope` to show only **details** (name +
 /// description), only **recipe**, or **everything** (tags and group are
@@ -18,19 +19,18 @@ struct DishEditView: View {
     @EnvironmentObject private var store: DishStore
     @Bindable var dish: Dish
     var scope: Scope = .full
+    var onDelete: (() -> Void)? = nil
 
     @State private var draftName: String = ""
     @State private var draftDescription: String = ""
     @State private var groupSelection: DishGroup?
-
-    // Chef attribution
-    @State private var draftChefName: String = ""
-    @State private var draftChefAvatarImage: UIImage? = nil
-    @State private var chefAvatarPickerItem: PhotosPickerItem? = nil
+    @State private var chefSelection: Chef?
+    @State private var confirmingDelete = false
+    @State private var showingRecipeAssistant = false
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottomTrailing) {
                 Theme.paper.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
@@ -60,29 +60,61 @@ struct DishEditView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.ink.opacity(0.2), lineWidth: 1))
                             }
 
-                            // Chef attribution editor
-                            chefEditorSection
+                            ChefPicker(selection: $chefSelection)
                         }
 
                         if showsTagsAndGroup {
-                            DishTagEditor(dish: dish)
+                            GroupPicker(selection: $groupSelection)
 
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Group")
+                                Text("Tags")
                                     .font(Theme.hand(13))
                                     .foregroundStyle(Theme.inkSoft)
-                                GroupPicker(selection: $groupSelection)
+                                DishTagEditor(dish: dish)
                             }
                         }
 
                         if showsRecipe {
                             RecipeEditorCard(dish: dish)
                         }
+
+                        if scope == .full {
+                            PhotosEditorCard(dish: dish)
+                        }
+
+                        if scope == .full {
+                            Button(role: .destructive) {
+                                confirmingDelete = true
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "trash")
+                                    Text("Delete Dish")
+                                }
+                                .font(Theme.serif(15, weight: .semibold))
+                                .foregroundStyle(Color.red)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color.red.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.red.opacity(0.25), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.top, 16)
+                        }
                     }
                     .padding(20)
-                    .padding(.bottom, 28)
+                    .padding(.bottom, 80)
                 }
                 .paperBackground()
+
+                if scope == .full {
+                    assistantFAB
+                        .padding(.trailing, 22)
+                        .padding(.bottom, 28)
+                }
             }
             .navigationTitle(navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -97,22 +129,25 @@ struct DishEditView: View {
                     .fontWeight(.semibold)
                 }
             }
+            .confirmationDialog("Remove this dish?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Remove", role: .destructive) {
+                    store.deleteDish(dish)
+                    dismiss()
+                    onDelete?()
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+            .sheet(isPresented: $showingRecipeAssistant) {
+                RecipeAssistantSheet(mode: .copilot(dish: dish))
+            }
             .onAppear {
                 draftName = dish.name
                 draftDescription = dish.dishDescription
                 groupSelection = dish.group
-                draftChefName = dish.chefName
-                if let data = dish.chefAvatarData {
-                    draftChefAvatarImage = UIImage(data: data)
-                }
+                chefSelection = dish.chefs.first
             }
-            .onChange(of: chefAvatarPickerItem) { _, item in
-                Task {
-                    if let data = try? await item?.loadTransferable(type: Data.self),
-                       let img = UIImage(data: data) {
-                        draftChefAvatarImage = img
-                    }
-                }
+            .onChange(of: dish.chefs) { _, newValue in
+                chefSelection = newValue.first
             }
         }
     }
@@ -129,6 +164,22 @@ struct DishEditView: View {
         scope == .full || scope == .recipeOnly
     }
 
+    private var assistantFAB: some View {
+        Button {
+            showingRecipeAssistant = true
+        } label: {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.white)
+                .frame(width: 58, height: 58)
+                .background(Circle().fill(Theme.ink))
+                .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1))
+                .shadow(color: Theme.ink.opacity(0.22), radius: 10, x: 0, y: 5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open Sous Chef assistant")
+    }
+
     private var navigationTitle: String {
         switch scope {
         case .full: return "Edit Dish"
@@ -138,92 +189,21 @@ struct DishEditView: View {
     }
 
     private func saveAndDismiss() {
+        let finalChefs = chefSelection.map { [$0] } ?? []
         switch scope {
         case .full:
             store.updateDishDetails(dish, name: draftName, description: draftDescription)
             store.setGroup(groupSelection, for: dish)
-            store.updateChef(dish, name: draftChefName, avatarImage: draftChefAvatarImage)
+            store.setChefs(finalChefs, for: dish)
         case .detailsOnly:
             store.updateDishDetails(dish, name: draftName, description: draftDescription)
-            store.updateChef(dish, name: draftChefName, avatarImage: draftChefAvatarImage)
+            store.setChefs(finalChefs, for: dish)
         case .recipeOnly:
             break
         }
         dismiss()
     }
-
-    // MARK: - Chef attribution editor section
-
-    private var chefEditorSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Chef")
-                .font(Theme.hand(13))
-                .foregroundStyle(Theme.inkSoft)
-
-            HStack(alignment: .center, spacing: 14) {
-                // Circular avatar picker
-                PhotosPicker(
-                    selection: $chefAvatarPickerItem,
-                    matching: .images,
-                    photoLibrary: .shared()
-                ) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.7))
-                            .frame(width: 64, height: 64)
-                        if let img = draftChefAvatarImage {
-                            Image(uiImage: img)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 64, height: 64)
-                                .clipShape(Circle())
-                        } else {
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 32, weight: .light))
-                                .foregroundStyle(Theme.inkFaded)
-                        }
-                    }
-                    .overlay(
-                        Circle()
-                            .stroke(Theme.ink.opacity(0.22), lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Pick chef avatar photo")
-
-                VStack(alignment: .leading, spacing: 6) {
-                    TextField("Chef name (optional)", text: $draftChefName)
-                        .font(Theme.serif(15))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(Color.white.opacity(0.55))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.ink.opacity(0.2), lineWidth: 1))
-
-                    if draftChefAvatarImage != nil {
-                        Button {
-                            draftChefAvatarImage = nil
-                            chefAvatarPickerItem = nil
-                            // Also clear from the dish immediately so it reflects on cancel
-                            dish.chefAvatarData = nil
-                        } label: {
-                            Text("Remove photo")
-                                .font(Theme.hand(12))
-                                .foregroundStyle(Theme.accent)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.35))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.ink.opacity(0.18), lineWidth: 1))
-    }
 }
-
 
 // MARK: - Tags (edit)
 
@@ -413,6 +393,7 @@ private struct RecipeEditorCard: View {
     @State private var pendingScan: ExtractedRecipe?
     @State private var showingMergeChoice = false
     @State private var scanError: String?
+    @State private var showingClearConfirm = false
 
     init(dish: Dish) {
         self.dish = dish
@@ -485,10 +466,10 @@ private struct RecipeEditorCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .cardStroke(cornerRadius: 16)
         .sheet(isPresented: $showingRecipeAssistant) {
-            RecipeAssistantSheet { scan in
-                receiveImport(scan)
+            RecipeAssistantSheet(mode: .copilot(dish: dish)) { scan in
+                pendingScan = scan
+                applyScan(replace: true)
             }
-            .environmentObject(store)
             .presentationDetents([.large])
         }
         .confirmationDialog(
@@ -512,18 +493,92 @@ private struct RecipeEditorCard: View {
         } message: { msg in
             Text(msg)
         }
+        .confirmationDialog(
+            "Clear entire recipe?",
+            isPresented: $showingClearConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Clear Recipe", role: .destructive) {
+                clearRecipe()
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .onDisappear(perform: persistRecipe)
     }
 
     private var recipeAssistantButton: some View {
-        Button {
-            showingRecipeAssistant = true
-        } label: {
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(Theme.ink)
+        HStack(spacing: 12) {
+            if hasContent {
+                Menu {
+                    Button(action: cleanUpRecipe) {
+                        Label("Clean Up (Trim)", systemImage: "sparkles")
+                    }
+                    Button(role: .destructive, action: { showingClearConfirm = true }) {
+                        Label("Clear Recipe", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(Theme.inkSoft)
+                }
+            }
+            
+            Button {
+                showingRecipeAssistant = true
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+            }
+            .accessibilityLabel("Recipe assistant — add text, photo, or video link")
         }
-        .accessibilityLabel("Recipe assistant — add text, photo, or video link")
+    }
+
+    private func cleanUpRecipe() {
+        let cleanedIngredients = ingredients.map { row in
+            IngredientLineRow(
+                quantity: row.quantity.trimmingCharacters(in: .whitespacesAndNewlines),
+                unit: row.unit.trimmingCharacters(in: .whitespacesAndNewlines),
+                name: row.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        }.filter { row in
+            !row.quantity.isEmpty || !row.unit.isEmpty || !row.name.isEmpty
+        }
+
+        let cleanedSteps = steps.map { step in
+            InlineRecipeLine(step.text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }.filter { step in
+            !step.text.isEmpty
+        }
+
+        let cleanedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        store.updateRecipe(
+            dish,
+            ingredientQuantities: cleanedIngredients.map { $0.quantity },
+            ingredientUnits: cleanedIngredients.map { $0.unit },
+            ingredientItems: cleanedIngredients.map { $0.name },
+            steps: cleanedSteps.map { $0.text },
+            notes: cleanedNotes
+        )
+        
+        ingredients = Self.loadIngredients(from: dish)
+        steps = dish.steps.map(InlineRecipeLine.init)
+        notes = dish.notes
+    }
+
+    private func clearRecipe() {
+        store.updateRecipe(
+            dish,
+            ingredientQuantities: [],
+            ingredientUnits: [],
+            ingredientItems: [],
+            steps: [],
+            notes: ""
+        )
+        ingredients = []
+        steps = []
+        notes = ""
     }
 
     private func receiveImport(_ extracted: ExtractedRecipe) {
@@ -1035,4 +1090,144 @@ private struct InlineRecipeLine: Identifiable, Equatable {
     var text: String
 
     init(_ text: String) { self.text = text }
+}
+
+// MARK: - Photos Editor
+
+private struct PhotosEditorCard: View {
+    @EnvironmentObject private var store: DishStore
+    let dish: Dish
+
+    @State private var selectedItems: [PhotosPickerItem] = []
+    @State private var isLoading = false
+    @State private var photoToDelete: DishPhoto?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .center) {
+                Text("Photos")
+                    .font(Theme.serif(22, weight: .semibold))
+                    .foregroundStyle(Theme.ink)
+                Spacer()
+                PhotosPicker(
+                    selection: $selectedItems,
+                    maxSelectionCount: 8,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Theme.ink)
+                }
+                .disabled(isLoading)
+            }
+            Rectangle()
+                .fill(Theme.ink)
+                .frame(height: 1)
+                .opacity(0.6)
+
+            if dish.photos.isEmpty {
+                Text("No photos yet. Add some photos of your dish.")
+                    .font(Theme.serif(14).italic())
+                    .foregroundStyle(Theme.inkSoft)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(dish.photos) { photo in
+                            ZStack(alignment: .topTrailing) {
+                                PhotoThumbnail(photo: photo)
+                                
+                                Button {
+                                    photoToDelete = photo
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(.white, Theme.ink.opacity(0.7))
+                                        .padding(4)
+                                }
+                                .buttonStyle(.plain)
+                                .offset(x: 6, y: -6)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 4)
+                }
+            }
+
+            if isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Saving photos…")
+                        .font(Theme.hand(13))
+                        .foregroundStyle(Theme.inkSoft)
+                }
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.45))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .cardStroke(cornerRadius: 16)
+        .confirmationDialog(
+            "Remove this photo from this dish?",
+            isPresented: Binding(
+                get: { photoToDelete != nil },
+                set: { if !$0 { photoToDelete = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove Photo", role: .destructive) {
+                if let p = photoToDelete {
+                    store.deletePhoto(p)
+                }
+                photoToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { photoToDelete = nil }
+        }
+        .onChange(of: selectedItems) { _, newItems in
+            guard !newItems.isEmpty else { return }
+            Task { await ingest(newItems) }
+        }
+    }
+
+    private func ingest(_ items: [PhotosPickerItem]) async {
+        isLoading = true
+        defer {
+            isLoading = false
+            selectedItems = []
+        }
+        for item in items {
+            guard
+                let data = try? await item.loadTransferable(type: Data.self),
+                let img = UIImage(data: data)
+            else { continue }
+            let takenAt = data.exifCaptureDate()
+            store.addPhoto(img, takenAt: takenAt, to: dish)
+        }
+    }
+}
+
+private struct PhotoThumbnail: View {
+    let photo: DishPhoto
+
+    var body: some View {
+        Group {
+            if let img = UIImage(data: photo.imageData) {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Color.white.opacity(0.5)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundStyle(Theme.inkFaded)
+                    )
+            }
+        }
+        .frame(width: 80, height: 80)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .cardStroke(cornerRadius: 12)
+    }
 }

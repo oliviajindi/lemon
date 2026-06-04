@@ -19,45 +19,44 @@ struct DishCardView: View {
                         .minimumScaleFactor(0.7)
                 }
 
-                if !dish.tags.isEmpty && !isCompactStyle {
-                    Text(dish.tags.prefix(4).map { "#\($0)" }.joined(separator: "  "))
-                        .font(.system(size: 12, weight: .regular, design: .default).italic())
-                        .foregroundStyle(Theme.inkSoft)
-                        .lineLimit(1)
-                }
-
                 if !isCompactStyle {
-                    HStack(spacing: 0) {
-                        Text(dish.createdAt.formatted(date: .abbreviated, time: .omitted))
-                            .font(Theme.hand(12))
-                            .foregroundStyle(Theme.inkSoft)
+                    HStack(spacing: 6) {
+                        // Chef credits — shown when one or more chefs have been set.
+                        if !dish.chefs.isEmpty {
+                            ForEach(Array(dish.chefs.enumerated()), id: \.element.id) { index, chef in
+                                NavigationLink(destination: ChefDishesView(chef: chef)) {
+                                    HStack(spacing: 0) {
+                                        ChefAvatarView(chef: chef, size: 14)
+                                            .padding(.trailing, 3)
 
-                        // Chef credit — only shown when a name has been set
-                        if !dish.chefName.isEmpty {
-                            Text("  ·  ")
-                                .font(Theme.hand(12))
-                                .foregroundStyle(Theme.inkFaded)
-
-                            // Tiny avatar
-                            Group {
-                                if let data = dish.chefAvatarData, let img = UIImage(data: data) {
-                                    Image(uiImage: img)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 14, height: 14)
-                                        .clipShape(Circle())
-                                } else {
-                                    Image(systemName: "person.crop.circle")
-                                        .font(.system(size: 12, weight: .light))
+                                        Text(chef.name)
+                                            .font(Theme.hand(12))
+                                            .foregroundStyle(Theme.inkFaded)
+                                            .lineLimit(1)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                
+                                if index < dish.chefs.count - 1 {
+                                    Text(", ")
+                                        .font(Theme.hand(12))
                                         .foregroundStyle(Theme.inkFaded)
                                 }
                             }
-                            .overlay(Circle().stroke(Theme.ink.opacity(0.15), lineWidth: 0.5))
-                            .padding(.trailing, 3)
+                        }
 
-                            Text(dish.chefName)
+                        // Separator between chef and tags
+                        if !dish.chefs.isEmpty && !dish.tags.isEmpty {
+                            Text("·")
                                 .font(Theme.hand(12))
                                 .foregroundStyle(Theme.inkFaded)
+                        }
+
+                        // Tags
+                        if !dish.tags.isEmpty {
+                            Text(dish.tags.prefix(4).map { "#\($0)" }.joined(separator: "  "))
+                                .font(.system(size: 12, weight: .regular, design: .default).italic())
+                                .foregroundStyle(Theme.inkSoft)
                                 .lineLimit(1)
                         }
                     }
@@ -69,6 +68,7 @@ struct DishCardView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, isCompactStyle ? 4 : 8)
+        .contentShape(Rectangle())
     }
 }
 

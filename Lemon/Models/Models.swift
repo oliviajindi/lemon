@@ -9,15 +9,14 @@ final class Dish {
     var imageData: Data?
     var createdAt: Date
 
-    /// The person who created / inspired this dish. Empty string means no attribution.
-    var chefName: String = ""
-    /// A JPEG-compressed portrait of the chef. Stored externally so the SQLite
-    /// database stays small. `nil` when no photo has been set.
-    @Attribute(.externalStorage) var chefAvatarData: Data?
-
     /// The section of the menu this dish belongs to. `nil` means the dish is
     /// shown under "Other dishes" on the menu.
     var group: DishGroup?
+
+    /// Reusable chef attribution. Chef records are managed separately
+    /// so changing a chef's name/avatar updates every linked dish.
+    @Relationship(deleteRule: .nullify, inverse: \Chef.dishes)
+    var chefs: [Chef] = []
 
     /// User-defined tags like "pasta", "breakfast", or "kid favorite".
     /// Tags are normalized before saving so casing/spacing stays consistent.
@@ -52,6 +51,8 @@ final class Dish {
         dishDescription: String = "",
         imageData: Data? = nil,
         group: DishGroup? = nil,
+        chef: Chef? = nil,
+        chefs: [Chef] = [],
         tags: [String] = [],
         ingredients: [String] = [],
         ingredientQty: [String] = [],
@@ -59,15 +60,14 @@ final class Dish {
         ingredientItem: [String] = [],
         steps: [String] = [],
         notes: String = "",
-        createdAt: Date = .now,
-        chefName: String = "",
-        chefAvatarData: Data? = nil
+        createdAt: Date = .now
     ) {
         self.id = id
         self.name = name
         self.dishDescription = dishDescription
         self.imageData = imageData
         self.group = group
+        self.chefs = chefs
         self.tags = DishTags.normalized(tags)
         self.ingredients = ingredients
         self.ingredientQty = ingredientQty
@@ -76,8 +76,33 @@ final class Dish {
         self.steps = steps
         self.notes = notes
         self.createdAt = createdAt
-        self.chefName = chefName
-        self.chefAvatarData = chefAvatarData
+        
+        if let chef {
+            self.chefs.append(chef)
+        }
+    }
+}
+
+/// A reusable person/creator record that can be assigned to many dishes.
+@Model
+final class Chef {
+    @Attribute(.unique) var id: UUID
+    var name: String
+    @Attribute(.externalStorage) var avatarData: Data?
+    var createdAt: Date
+
+    var dishes: [Dish] = []
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        avatarData: Data? = nil,
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.name = name
+        self.avatarData = avatarData
+        self.createdAt = createdAt
     }
 }
 
@@ -129,36 +154,60 @@ enum RecipeIngredientFormat {
 
         let parts = t.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !parts.isEmpty else { return ("", "", "") }
+        
+        // 1. Check if the line starts with a quantity token (Classic shape: e.g. "2 cups flour", "6g flour")
         let first = parts[0]
-        guard startsLikeQuantityToken(first) else {
-            return ("", "", t)
+        if startsLikeQuantityToken(first) {
+            var qty = first
+            var unit = ""
+            var idx = 1
+
+            if let (q, u) = splitGluedQuantityUnit(first) {
+                qty = q
+                unit = u
+            } else if idx < parts.count {
+                let cand = parts[idx]
+                let hasLetter = cand.contains(where: \.isLetter)
+                if hasLetter, cand.count <= 12 {
+                    unit = cand
+                    idx += 1
+                }
+            }
+
+            let name = parts[idx...].joined(separator: " ")
+            return (qty, unit, name)
         }
-
-        var qty = first
-        var unit = ""
-        var idx = 1
-
-        if let (q, u) = splitGluedQuantityUnit(first) {
-            // The first token already carries both magnitude and unit
-            // (e.g. "6g", "250ml", "1tbsp"). Take them as-is and let the
-            // rest of the line be the ingredient name.
-            qty = q
-            unit = u
-        } else if idx < parts.count {
-            // Fallback: classic "<qty> <unit> <name>" shape. Adopt the
-            // next token as the unit only when it looks like a unit
-            // (short and lettered) — otherwise leave it as part of the
-            // name.
-            let cand = parts[idx]
-            let hasLetter = cand.contains(where: \.isLetter)
-            if hasLetter, cand.count <= 12 {
-                unit = cand
-                idx += 1
+        
+        // 2. Check if the line ends with a quantity or quantity+unit (Inverted shape: e.g. "flour 200g", "flour 200 g")
+        if parts.count >= 2 {
+            let lastToken = parts[parts.count - 1]
+            let secondLastToken = parts[parts.count - 2]
+            
+            // Case A: Glued quantity + unit at the end, e.g. "flour 200g"
+            if let (q, u) = splitGluedQuantityUnit(lastToken) {
+                let name = parts[..<(parts.count - 1)].joined(separator: " ")
+                return (q, u, name)
+            }
+            
+            // Case B: Space-separated quantity and unit at the end, e.g. "flour 200 g", "flour 1/2 cup"
+            if startsLikeQuantityToken(secondLastToken) &&
+                lastToken.contains(where: \.isLetter) &&
+                lastToken.count <= 12 &&
+                splitGluedQuantityUnit(secondLastToken) == nil {
+                let name = parts[..<(parts.count - 2)].joined(separator: " ")
+                return (secondLastToken, lastToken, name)
+            }
+            
+            // Case C: Numeric quantity only at the end (no unit), e.g. "eggs 3"
+            if startsLikeQuantityToken(lastToken) &&
+                splitGluedQuantityUnit(lastToken) == nil {
+                let name = parts[..<(parts.count - 1)].joined(separator: " ")
+                return (lastToken, "", name)
             }
         }
-
-        let name = parts[idx...].joined(separator: " ")
-        return (qty, unit, name)
+        
+        // 3. Fallback: Entire line is name only
+        return ("", "", t)
     }
 
     private static func startsLikeQuantityToken(_ s: String) -> Bool {
@@ -418,3 +467,92 @@ struct ExtractedRecipe: Equatable, Codable {
 
     var isEmpty: Bool { ingredients.isEmpty && steps.isEmpty }
 }
+
+/// A single ingredient with structured fields returned by the assistant.
+struct AssistantIngredient: Equatable, Codable {
+    var qty: String?
+    var unit: String?
+    var name: String?
+}
+
+/// An action routed by the Sous Chef conversational AI assistant.
+struct AssistantAction: Equatable, Codable {
+    enum ActionType: String, Codable {
+        case reply = "reply"
+        case create_dish = "create_dish"
+        case update_title = "update_title"
+        case update_description = "update_description"
+        case update_recipe = "update_recipe"
+        case redraw = "redraw"
+        case add_tag = "add_tag"
+        case remove_tag = "remove_tag"
+        case add_chef = "add_chef"
+        case set_group = "set_group"
+    }
+
+    var reply: String
+    var action: ActionType
+    var title: String?
+    var description: String?
+    var ingredients: [AssistantIngredient]?
+    var steps: [String]?
+    var redrawNotes: String?
+    var tag: String?
+    var chefName: String?
+    var groupName: String?
+}
+
+/// A line in the Sous Chef conversational assistant history.
+struct AssistantChatLine: Identifiable, Equatable, Codable {
+    enum Role: String, Codable {
+        case user = "user"
+        case assistant = "assistant"
+    }
+
+    var id: UUID = UUID()
+    var role: Role
+    var text: String
+    var imageData: Data?
+    var illustrationData: Data?
+
+    init(id: UUID = UUID(), role: Role, text: String, imageData: Data? = nil, illustrationData: Data? = nil) {
+        self.id = id
+        self.role = role
+        self.text = text
+        self.imageData = imageData
+        self.illustrationData = illustrationData
+    }
+}
+
+struct DishCandidate: Identifiable, Equatable {
+    let id: UUID = UUID()
+    var name: String
+    var description: String
+    var aiDescription: String = ""
+    var tagsText: String = ""
+    var tags: [String] = []
+    var chefs: [String] = []
+    var groupName: String? = nil
+    var ingredients: [String] = []
+    var steps: [String] = []
+    var illustration: Data? = nil
+    var isGenerating: Bool = false
+    var error: String? = nil
+
+    static func == (l: Self, r: Self) -> Bool {
+        l.id == r.id &&
+        l.name == r.name &&
+        l.description == r.description &&
+        l.aiDescription == r.aiDescription &&
+        l.tagsText == r.tagsText &&
+        l.tags == r.tags &&
+        l.chefs == r.chefs &&
+        l.groupName == r.groupName &&
+        l.ingredients == r.ingredients &&
+        l.steps == r.steps &&
+        l.illustration == r.illustration &&
+        l.isGenerating == r.isGenerating &&
+        l.error == r.error
+    }
+}
+

@@ -8,6 +8,11 @@ private struct TodayMealRoute: Hashable {
     var day: Date
 }
 
+struct ShareItem: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
 /// Minimal meal index for today. Each meal opens into a clean menu-style page
 /// that lists only dish names.
 struct TodayView: View {
@@ -21,12 +26,16 @@ struct TodayView: View {
     private var allMenuDishes: [Dish]
 
     @AppStorage("Lemon.todayMealNames") private var storedMealNames = ""
+    @AppStorage("Lemon.profileDisplayName") private var profileDisplayName = ""
+    @State private var localDayMealNamesSerialized = ""
     @State private var isAddingMeal = false
     @State private var newMealName = ""
     @FocusState private var newMealFocused: Bool
     @State private var selectedDay: Date = Calendar.current.startOfDay(for: .now)
     @State private var showingMenuDateSheet = false
+    @State private var showingEmptyShareAlert = false
     @State private var showingPlanSheet = false
+    @State private var shareItem: ShareItem? = nil
 
     private var selectedDayStart: Date {
         Calendar.current.startOfDay(for: selectedDay)
@@ -48,78 +57,171 @@ struct TodayView: View {
     }
 
     private var mealNames: [String] {
+        let localNames = parsedMealNames(from: localDayMealNamesSerialized)
+        if !localNames.isEmpty {
+            return localNames
+        }
         let names = parsedMealNames(from: storedMealNames)
         return names.isEmpty ? TodayMeal.allCases.map(\.rawValue) : names
     }
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
-                VStack(alignment: .leading, spacing: 34) {
-                    masthead
+        ZStack {
+            NavigationStack {
+                ZStack(alignment: .bottomTrailing) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 34) {
+                            masthead
 
-                    VStack(alignment: .leading, spacing: 18) {
-                        ForEach(Array(mealNames.enumerated()), id: \.element) { index, mealName in
-                            if index > 0 {
-                                Rectangle()
-                                    .fill(Theme.ink.opacity(0.18))
-                                    .frame(height: 1)
+                            VStack(alignment: .leading, spacing: 18) {
+                                ForEach(Array(mealNames.enumerated()), id: \.element) { index, mealName in
+                                    if index > 0 {
+                                        Rectangle()
+                                            .fill(Theme.ink.opacity(0.18))
+                                            .frame(height: 1)
+                                    }
+
+                                    HStack(alignment: .top, spacing: 10) {
+                                        NavigationLink(value: TodayMealRoute(mealName: mealName, day: selectedDayStart)) {
+                                            TodayMealIndexRow(mealName: mealName, entries: entries(for: mealName))
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        Button {
+                                            deleteMeal(mealName)
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Theme.inkFaded)
+                                                .padding(.top, 3)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+
+                                addMealControl
                             }
+                        }
+                        .padding(.horizontal, 36)
+                        .padding(.top, 20)
+                        .padding(.bottom, 120)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-                            HStack(alignment: .top, spacing: 10) {
-                                NavigationLink(value: TodayMealRoute(mealName: mealName, day: selectedDayStart)) {
-                                    TodayMealIndexRow(mealName: mealName, entries: entries(for: mealName))
-                                }
-                                .buttonStyle(.plain)
 
-                                Button {
-                                    deleteMeal(mealName)
-                                } label: {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundStyle(Theme.inkFaded)
-                                        .padding(.top, 3)
-                                }
-                                .buttonStyle(.plain)
+                    planDayFAB
+                        .padding(.trailing, 22)
+                        .padding(.bottom, 28)
+                }
+                .paperBackground()
+                .lemonNavigationTitle("Today")
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            renderAndShareMenu()
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(Theme.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Share today's menu")
+                    }
+                }
+                .navigationDestination(for: TodayMealRoute.self) { route in
+                    TodayMealDetailView(mealName: route.mealName, day: route.day)
+                }
+                .sheet(isPresented: $showingMenuDateSheet) {
+                    MenuDatePickerSheet(selectedDay: $selectedDay, range: menuDayPickerRange)
+                }
+                .sheet(isPresented: $showingPlanSheet, onDismiss: {
+                    loadLocalDayMeals(for: selectedDayStart)
+                }) {
+                    RecipeAssistantSheet(mode: .today(day: selectedDayStart, mealNames: mealNames))
+                }
+                .sheet(item: $shareItem) { item in
+                    let cafeName = profileDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let title = cafeName.isEmpty ? "Lemon Café" : cafeName
+                    TodayMenuShareSheet(
+                        title: title,
+                        image: item.image
+                    )
+                }
+                .onAppear {
+                    loadLocalDayMeals(for: selectedDayStart)
+                }
+                .onChange(of: selectedDay) { _, newValue in
+                    let normalized = Calendar.current.startOfDay(for: newValue)
+                    if normalized != selectedDay {
+                        selectedDay = normalized
+                    }
+                    loadLocalDayMeals(for: normalized)
+                }
+            }
+
+            if showingEmptyShareAlert {
+                ZStack {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                showingEmptyShareAlert = false
                             }
                         }
 
-                        addMealControl
+                    VStack(spacing: 24) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 28))
+                            .foregroundStyle(Theme.accent)
+                            .padding(.bottom, 4)
+
+                        VStack(spacing: 8) {
+                            let displayName = profileDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                            let greetingName = displayName.isEmpty ? "Chef" : displayName
+                            Text("Hi \(greetingName)!")
+                                .font(Theme.title(22, weight: .semibold))
+                                .foregroundStyle(Theme.ink)
+
+                            Text("Missing dishes for today's menu. Wanna add something first?")
+                                .font(Theme.serif(15))
+                                .foregroundStyle(Theme.inkSoft)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(4)
+                        }
+                        .padding(.horizontal, 8)
+
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                showingEmptyShareAlert = false
+                            }
+                        } label: {
+                            Text("OK")
+                                .font(Theme.serif(15, weight: .semibold))
+                                .foregroundStyle(Theme.paper)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Theme.ink)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .shadow(color: Theme.ink.opacity(0.15), radius: 6, x: 0, y: 3)
+                        }
+                        .buttonStyle(.plain)
                     }
-
-                    Spacer(minLength: 0)
+                    .padding(28)
+                    .background(
+                        ZStack {
+                            Theme.paper
+                            PaperTexture()
+                                .opacity(0.25)
+                                .allowsHitTesting(false)
+                        }
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .cardStroke(cornerRadius: 24, inkOpacity: 0.3)
+                    .shadow(color: Theme.ink.opacity(0.12), radius: 25, x: 0, y: 12)
+                    .padding(.horizontal, 40)
                 }
-                .padding(.horizontal, 36)
-                .padding(.top, 20)
-                .padding(.bottom, 88)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-                planDayFAB
-                    .padding(.trailing, 22)
-                    .padding(.bottom, 28)
-            }
-            .paperBackground()
-            .lemonNavigationTitle("Today")
-            .navigationDestination(for: TodayMealRoute.self) { route in
-                TodayMealDetailView(mealName: route.mealName, day: route.day)
-            }
-            .sheet(isPresented: $showingMenuDateSheet) {
-                MenuDatePickerSheet(selectedDay: $selectedDay, range: menuDayPickerRange)
-            }
-            .sheet(isPresented: $showingPlanSheet) {
-                TodayAIMealPlanSheet(
-                    day: selectedDayStart,
-                    mealNames: mealNames,
-                    dishCount: allMenuDishes.count
-                )
-                .environmentObject(store)
-                .environmentObject(config)
-            }
-            .onChange(of: selectedDay) { _, newValue in
-                let normalized = Calendar.current.startOfDay(for: newValue)
-                if normalized != selectedDay {
-                    selectedDay = normalized
-                }
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
     }
@@ -147,46 +249,121 @@ struct TodayView: View {
         .accessibilityHint("Chooses dishes from your menu for each meal")
     }
 
-    private var masthead: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(isViewingActualToday ? "Today" : selectedDayStart.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
-                .font(Theme.title(38))
-                .foregroundStyle(Theme.ink)
 
-            Button {
-                showingMenuDateSheet = true
-            } label: {
-                HStack(spacing: 6) {
-                    Text(selectedDayStart.formatted(date: .complete, time: .omitted))
-                        .font(Theme.serif(14).italic())
-                        .foregroundStyle(Theme.inkSoft)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Theme.inkFaded)
+
+    private var masthead: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(isViewingActualToday ? "Today" : selectedDayStart.formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))
+                    .font(Theme.title(38))
+                    .foregroundStyle(Theme.ink)
+
+                Button {
+                    showingMenuDateSheet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(selectedDayStart.formatted(date: .complete, time: .omitted))
+                            .font(Theme.serif(14).italic())
+                            .foregroundStyle(Theme.inkSoft)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.inkFaded)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Choose menu date")
+                .accessibilityHint("Opens date picker")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Choose menu date")
-            .accessibilityHint("Opens date picker")
+
+            Spacer()
         }
+    }
+
+    private var suggestedMealChoices: [String] {
+        let currentMeals = Set(mealNames.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) })
+        
+        // 1. Core defaults
+        let defaults = TodayMeal.allCases.map(\.rawValue)
+        
+        // 2. Fetch all other unique meal names historically planned across any day to learn custom user slots!
+        let allPlannedMeals = Array(Set(entries.map(\.meal)))
+        
+        // Combine all candidates
+        var candidates: [String] = []
+        var seen = Set<String>()
+        
+        for meal in (defaults + allPlannedMeals) {
+            let normalized = meal.trimmingCharacters(in: .whitespacesAndNewlines)
+            let key = normalized.lowercased()
+            guard !key.isEmpty, !seen.contains(key), !currentMeals.contains(key) else { continue }
+            seen.insert(key)
+            candidates.append(normalized)
+        }
+        
+        // Filter by text query if any
+        let query = newMealName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if !query.isEmpty {
+            candidates = candidates.filter { $0.lowercased().contains(query) }
+        }
+        
+        return candidates.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     @ViewBuilder
     private var addMealControl: some View {
         if isAddingMeal {
-            HStack(spacing: 10) {
-                TextField("New meal", text: $newMealName)
-                    .font(Theme.serif(18))
-                    .textInputAutocapitalization(.words)
-                    .focused($newMealFocused)
-                    .submitLabel(.done)
-                    .onSubmit(addMeal)
-                Button(action: addMeal) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Theme.ink)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    TextField("New meal", text: $newMealName)
+                        .font(Theme.serif(18))
+                        .textInputAutocapitalization(.words)
+                        .focused($newMealFocused)
+                        .submitLabel(.done)
+                        .onSubmit(addMeal)
+                    Button(action: addMeal) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        isAddingMeal = false
+                        newMealName = ""
+                        newMealFocused = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Theme.inkSoft)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                
+                let suggestions = suggestedMealChoices
+                if !suggestions.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(suggestions, id: \.self) { choice in
+                                Button {
+                                    newMealName = choice
+                                    addMeal()
+                                } label: {
+                                    Text(choice)
+                                        .font(Theme.hand(12))
+                                        .foregroundStyle(Theme.inkSoft)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.white.opacity(0.55))
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(Theme.ink.opacity(0.18), lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 2)
+                    }
+                }
             }
         } else {
             Button {
@@ -215,15 +392,36 @@ struct TodayView: View {
             isAddingMeal = false
             return
         }
-        storedMealNames = serializedMealNames(mealNames + [trimmed])
+        let updatedList = mealNames + [trimmed]
+        let serialized = serializedMealNames(updatedList)
+        let dayKey = keyForDay(selectedDayStart)
+        UserDefaults.standard.set(serialized, forKey: dayKey)
+        localDayMealNamesSerialized = serialized
         newMealName = ""
         isAddingMeal = false
         newMealFocused = false
     }
 
     private func deleteMeal(_ mealName: String) {
-        storedMealNames = serializedMealNames(mealNames.filter { $0 != mealName })
+        let updatedList = mealNames.filter { $0 != mealName }
+        let serialized = serializedMealNames(updatedList)
+        let dayKey = keyForDay(selectedDayStart)
+        UserDefaults.standard.set(serialized, forKey: dayKey)
+        localDayMealNamesSerialized = serialized
         store.deleteTodayMeal(mealName, day: selectedDayStart)
+    }
+
+    private func keyForDay(_ day: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: day)
+        return "Lemon.todayMealNames.\(dateStr)"
+    }
+
+    private func loadLocalDayMeals(for day: Date) {
+        let dayStart = Calendar.current.startOfDay(for: day)
+        let dayKey = keyForDay(dayStart)
+        localDayMealNamesSerialized = UserDefaults.standard.string(forKey: dayKey) ?? ""
     }
 
     private func parsedMealNames(from value: String) -> [String] {
@@ -245,139 +443,33 @@ struct TodayView: View {
         }
         .joined(separator: "\n")
     }
-}
 
-// MARK: - AI meal plan sheet
+    // MARK: - Share helpers
 
-private struct TodayAIMealPlanSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var store: DishStore
-    @EnvironmentObject private var config: AppConfig
-
-    let day: Date
-    let mealNames: [String]
-    let dishCount: Int
-
-    @State private var note = ""
-    @State private var isWorking = false
-    @State private var errorMessage: String?
-
-    private var dayLabel: String {
-        Calendar.current.startOfDay(for: day).formatted(date: .complete, time: .omitted)
-    }
-
-    private var canUseDirectGemini: Bool {
-        true
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("The AI chooses only from dishes already on your Menu; it will not invent new recipes. Tapping Generate replaces every dish you had scheduled on this date.")
-                        .font(Theme.serif(15))
-                        .foregroundStyle(Theme.inkSoft)
-
-                    if dishCount == 0 {
-                        Text("Add dishes from the Menu tab first.")
-                            .font(Theme.serif(15, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
-                    }
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("NOTES (OPTIONAL)")
-                            .font(Theme.serif(12, weight: .semibold))
-                            .tracking(4)
-                            .foregroundStyle(Theme.inkFaded)
-                        TextField("e.g. keep lunch light, vegetarian dinner", text: $note, axis: .vertical)
-                            .font(Theme.serif(16))
-                            .lineLimit(3...6)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.55))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(Theme.ink.opacity(0.18), lineWidth: 1)
-                            )
-                    }
-                    .disabled(!canUseDirectGemini || dishCount == 0 || isWorking)
-
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(Theme.hand(14))
-                            .foregroundStyle(Theme.accent)
-                    }
-
-                    Button(action: runPlan) {
-                        HStack(spacing: 10) {
-                            if isWorking {
-                                ProgressView()
-                                    .tint(Color.white)
-                            }
-                            Text(isWorking ? "Planning…" : "Generate plan")
-                                .font(Theme.serif(17, weight: .semibold))
-                                .tracking(1)
-                        }
-                        .foregroundStyle(Color.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(canRun ? Theme.ink : Theme.inkFaded.opacity(0.45))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canRun)
-                }
-                .padding(24)
-                .padding(.bottom, 24)
-            }
-            .paperBackground()
-            .navigationTitle("Plan \(dayLabel)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
-                        .font(Theme.hand(16))
-                        .disabled(isWorking)
-                }
-            }
+    private func renderAndShareMenu() {
+        let meals: [(name: String, dishes: [String])] = mealNames.compactMap { mealName in
+            let dishNames = todayEntries
+                .filter { $0.meal == mealName }
+                .compactMap { $0.dish?.name }
+            guard !dishNames.isEmpty else { return nil }
+            return (name: mealName, dishes: dishNames)
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
 
-    private var canRun: Bool {
-        canUseDirectGemini && dishCount > 0 && !isWorking && !mealNames.isEmpty
-    }
-
-    private func runPlan() {
-        guard canRun else { return }
-        isWorking = true
-        errorMessage = nil
-        let mealList = mealNames
-        let noteCopy = note
-        let dayCopy = day
-        Task { @MainActor in
-            do {
-                let plan = try await store.generateDayMealPlanForToday(
-                    day: dayCopy,
-                    mealNames: mealList,
-                    userNote: noteCopy.isEmpty ? nil : noteCopy
-                )
-                let picked = plan.assignments.reduce(0) { $0 + $1.dishIds.count }
-                guard picked > 0 else {
-                    errorMessage = "The AI didn't assign any dishes. Try different notes or check that your meal names match what you use in Today."
-                    isWorking = false
-                    return
-                }
-                store.replaceTodayEntries(with: plan, day: dayCopy, mealNames: mealList)
-                dismiss()
-            } catch {
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                isWorking = false
+        guard !meals.isEmpty else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                showingEmptyShareAlert = true
             }
+            return
+        }
+
+        let cafeName = profileDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = cafeName.isEmpty ? "Lemon Café" : cafeName
+
+        let card = TodayMenuShareCard(title: title, day: selectedDayStart, meals: meals)
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = UIScreen.main.scale
+        if let uiImage = renderer.uiImage {
+            shareItem = ShareItem(image: uiImage)
         }
     }
 }
@@ -703,43 +795,44 @@ private struct TodayMealDetailView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 34) {
-            mealHeader
+        ScrollView {
+            VStack(alignment: .leading, spacing: 34) {
+                mealHeader
 
-            VStack(alignment: .leading, spacing: 26) {
-                TodayUnsectionedDishes(
-                    entries: unsectionedEntries,
-                    onAdd: {
-                        pickingSection = nil
-                        showingPicker = true
-                    },
-                    onRemove: { entry in store.removeFromToday(entry) }
-                )
+                VStack(alignment: .leading, spacing: 26) {
+                    TodayUnsectionedDishes(
+                        entries: unsectionedEntries,
+                        onAdd: {
+                            pickingSection = nil
+                            showingPicker = true
+                        },
+                        onRemove: { entry in store.removeFromToday(entry) }
+                    )
 
-                if !sectionNames.isEmpty {
-                    ForEach(sectionNames, id: \.self) { section in
-                        TodayCourseSection(
-                            title: section,
-                            entries: entries(for: section),
-                            isCollapsed: collapsedSections.contains(section),
-                            onLongPressHeader: { toggleSection(section) },
-                            onAdd: {
-                                pickingSection = section
-                                showingPicker = true
-                            },
-                            onRemove: { entry in store.removeFromToday(entry) },
-                            onMoveEntry: { entryID in moveEntry(entryID, to: section) }
-                        )
+                    if !sectionNames.isEmpty {
+                        ForEach(sectionNames, id: \.self) { section in
+                            TodayCourseSection(
+                                title: section,
+                                entries: entries(for: section),
+                                isCollapsed: collapsedSections.contains(section),
+                                onLongPressHeader: { toggleSection(section) },
+                                onAdd: {
+                                    pickingSection = section
+                                    showingPicker = true
+                                },
+                                onRemove: { entry in store.removeFromToday(entry) },
+                                onMoveEntry: { entryID in moveEntry(entryID, to: section) }
+                            )
+                        }
                     }
+
+                    addSectionControl
                 }
-
-                addSectionControl
             }
-
-            Spacer(minLength: 0)
+            .padding(.horizontal, 40)
+            .padding(.top, 42)
+            .padding(.bottom, 60)
         }
-        .padding(.horizontal, 40)
-        .padding(.top, 42)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .paperBackground()
         .navigationTitle(mealName)
@@ -754,9 +847,11 @@ private struct TodayMealDetailView: View {
                 mealName: mealName,
                 sectionName: pickingSection,
                 menuDay: menuDay,
-                selectedDishIDs: selectedDishIDs(for: section)
-            ) { dish in
-                store.addToToday(dish, day: menuDay, mealName: mealName, courseName: section)
+                alreadyAddedIDs: selectedDishIDs(for: section)
+            ) { dishes in
+                for dish in dishes {
+                    store.addToToday(dish, day: menuDay, mealName: mealName, courseName: section)
+                }
                 pickingSection = nil
                 showingPicker = false
             }
@@ -1027,8 +1122,9 @@ private struct TodayDishPickerView: View {
     let sectionName: String?
     /// Start-of-day for the menu row being edited.
     let menuDay: Date
-    let selectedDishIDs: Set<UUID>
-    let onSelect: (Dish) -> Void
+    /// Dish IDs already added to this meal/section (shown as disabled checkmarks).
+    let alreadyAddedIDs: Set<UUID>
+    let onSelectMultiple: ([Dish]) -> Void
 
     @Query(sort: [SortDescriptor(\DishGroup.displayOrder), SortDescriptor(\DishGroup.createdAt)])
     private var groups: [DishGroup]
@@ -1037,6 +1133,11 @@ private struct TodayDishPickerView: View {
     private var dishes: [Dish]
 
     @State private var searchText = ""
+    @State private var newSelections: [Dish] = []
+
+    private var newSelectionIDs: Set<UUID> {
+        Set(newSelections.map(\.id))
+    }
 
     private var filteredDishes: [Dish] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -1092,8 +1193,9 @@ private struct TodayDishPickerView: View {
                                 title: group.name,
                                 emoji: group.emoji,
                                 dishes: filteredDishes.filter { $0.group?.id == group.id },
-                                selectedDishIDs: selectedDishIDs,
-                                onSelect: onSelect
+                                alreadyAddedIDs: alreadyAddedIDs,
+                                newSelectionIDs: newSelectionIDs,
+                                onToggle: toggleDish
                             )
                         }
 
@@ -1101,8 +1203,9 @@ private struct TodayDishPickerView: View {
                             title: groups.isEmpty ? "All Dishes" : "Other Dishes",
                             emoji: nil,
                             dishes: filteredDishes.filter { $0.group == nil },
-                            selectedDishIDs: selectedDishIDs,
-                            onSelect: onSelect
+                            alreadyAddedIDs: alreadyAddedIDs,
+                            newSelectionIDs: newSelectionIDs,
+                            onToggle: toggleDish
                         )
                     }
                     .padding(.bottom, 20)
@@ -1116,7 +1219,26 @@ private struct TodayDishPickerView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        onSelectMultiple(newSelections)
+                        dismiss()
+                    } label: {
+                        Text(newSelections.isEmpty ? "Done" : "Add \(newSelections.count)")
+                            .font(Theme.serif(16, weight: .semibold))
+                            .foregroundStyle(newSelections.isEmpty ? Theme.inkFaded : Theme.ink)
+                    }
+                    .disabled(newSelections.isEmpty)
+                }
             }
+        }
+    }
+
+    private func toggleDish(_ dish: Dish) {
+        if let idx = newSelections.firstIndex(where: { $0.id == dish.id }) {
+            newSelections.remove(at: idx)
+        } else {
+            newSelections.append(dish)
         }
     }
 }
@@ -1125,8 +1247,11 @@ private struct DishPickerGroupSection: View {
     let title: String
     let emoji: String?
     let dishes: [Dish]
-    let selectedDishIDs: Set<UUID>
-    let onSelect: (Dish) -> Void
+    /// IDs of dishes already added to this meal (shown as permanently checked & disabled).
+    let alreadyAddedIDs: Set<UUID>
+    /// IDs of dishes newly selected in this picker session.
+    let newSelectionIDs: Set<UUID>
+    let onToggle: (Dish) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1145,24 +1270,31 @@ private struct DishPickerGroupSection: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(dishes) { dish in
+                        let isAlreadyAdded = alreadyAddedIDs.contains(dish.id)
+                        let isNewlySelected = newSelectionIDs.contains(dish.id)
+
                         Button {
-                            onSelect(dish)
+                            onToggle(dish)
                         } label: {
                             HStack(spacing: 12) {
                                 Text(dish.name)
-                                .font(Theme.dishName(14))
-                                    .foregroundStyle(Theme.ink)
+                                    .font(Theme.dishName(14))
+                                    .foregroundStyle(isAlreadyAdded ? Theme.inkFaded : Theme.ink)
                                     .lineLimit(1)
                                 Spacer()
-                                Image(systemName: selectedDishIDs.contains(dish.id) ? "checkmark.circle.fill" : "plus.circle.fill")
+                                Image(systemName: (isAlreadyAdded || isNewlySelected) ? "checkmark.circle.fill" : "circle")
                                     .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(selectedDishIDs.contains(dish.id) ? Theme.inkFaded : Theme.ink)
+                                    .foregroundStyle(
+                                        isAlreadyAdded ? Theme.inkFaded
+                                        : isNewlySelected ? Theme.accent
+                                        : Theme.ink.opacity(0.35)
+                                    )
                             }
                             .padding(.vertical, 9)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .disabled(selectedDishIDs.contains(dish.id))
+                        .disabled(isAlreadyAdded)
 
                         if dish.id != dishes.last?.id {
                             DottedDivider().padding(.horizontal, 2)

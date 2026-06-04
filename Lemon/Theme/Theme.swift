@@ -18,7 +18,7 @@ enum Theme {
 
     /// Big page masthead font: bundled Raleway.
     static func title(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        Font.custom("Raleway-Thin", size: size).weight(weight)
+        Font.custom("Raleway", size: size).weight(weight)
     }
 
     /// Dish names use plain SF Pro, slightly lighter than before so the
@@ -32,12 +32,12 @@ enum Theme {
     /// Today, calendar) keep `dishName` so they stay readable at small
     /// sizes.
     static func menuDishName(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
-        Font.custom("Raleway-Thin", size: size).weight(weight)
+        Font.custom("Raleway", size: size).weight(weight)
     }
 
     /// Section/group names use Raleway too, matching the menu masthead.
     static func groupName(_ size: CGFloat, weight: Font.Weight = .heavy) -> Font {
-        Font.custom("Raleway-Thin", size: size).weight(weight)
+        Font.custom("Raleway", size: size).weight(weight)
     }
 
     /// Small label/accent font.

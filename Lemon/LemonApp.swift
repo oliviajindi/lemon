@@ -55,36 +55,19 @@ struct LemonApp: App {
         FirebaseApp.configure()
 
         LegacyDefaultsMigration.runIfNeeded()
-    }
 
-    @State private var showWelcome = true
+        // Make the segmented picker transparent so it doesn't overlap
+        // with the navigation bar toolbar background.
+        UISegmentedControl.appearance().backgroundColor = .clear
+    }
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if showWelcome {
-                    WelcomeView {
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            showWelcome = false
-                        }
-                    }
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            if showWelcome {
-                                withAnimation(.easeInOut(duration: 0.4)) {
-                                    showWelcome = false
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    RootView()
-                }
-            }
-            .environmentObject(config)
-            .environmentObject(store)
-            .tint(Theme.ink)
-            .preferredColorScheme(ColorScheme.light)
+            RootView()
+                .environmentObject(config)
+                .environmentObject(store)
+                .tint(Theme.ink)
+                .preferredColorScheme(ColorScheme.light)
         }
         .modelContainer(DishStore.sharedContainer)
     }

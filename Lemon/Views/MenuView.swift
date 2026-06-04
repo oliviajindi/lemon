@@ -55,6 +55,7 @@ struct MenuView: View {
     @State private var showingNewGroupEmojiPicker = false
     @State private var addingDishToGroup: DishGroup?
     @State private var isAddingDish = false
+    @State private var path = NavigationPath()
 
     /// IDs of collapsed sections. We use the group's own UUID for real groups
     /// and `Self.ungroupedSectionID` for the "Other Dishes" pseudo-section.
@@ -65,6 +66,8 @@ struct MenuView: View {
     @State private var preEditCollapsedIDs: Set<UUID> = []
     @State private var draggedGroup: DishGroup? = nil
     @State private var isDraggingDish = false
+    @State private var searchText = ""
+    @State private var isSearchExpanded = false
 
     /// Sentinel ID representing the "Other Dishes" / "All Dishes" section so
     /// it can participate in the same collapse machinery as real groups.
@@ -72,7 +75,7 @@ struct MenuView: View {
     private static let collapsedKey = "Lemon.collapsedSectionIDs"
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack(alignment: .bottomTrailing) {
                 Theme.paper.ignoresSafeArea()
                     .contentShape(Rectangle())
@@ -90,62 +93,196 @@ struct MenuView: View {
                                 subtitle: $menuSubtitle,
                                 isEditing: $isEditingGroups
                             )
-                            .padding(.bottom, isEditingGroups ? 0 : 16)
+                            .padding(.bottom, isEditingGroups ? 0 : 8)
 
-                            ForEach(groups) { group in
-                                MenuSection(
-                                    group: group,
-                                    dishes: dishesIn(group),
-                                    layout: layout,
-                                    isCollapsed: collapsedIDs.contains(group.id),
-                                    isEditingGroups: isEditingGroups,
-                                    isDraggingDish: isDraggingDish,
-                                    draggedGroup: $draggedGroup,
-                                    groups: groups,
-                                    onToggle: { toggleCollapsed(group.id) },
-                                    onAdd: { addingDishToGroup = group },
-                                    onDelete: { store.deleteGroup(group) },
-                                    onDragStart: handleDragStart,
-                                    onDropDish: { dish in
-                                        store.setGroup(group, for: dish)
+                            if isEditingGroups {
+                                HStack {
+                                    Text("Drag groups to reorder")
+                                        .font(Theme.serif(13).italic())
+                                        .foregroundStyle(Theme.inkSoft)
+                                    
+                                    Spacer()
+                                    
+                                    Button {
                                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                            var nextCollapsed = preDragCollapsedIDs
-                                            nextCollapsed.remove(group.id)
-                                            collapsedIDs = nextCollapsed
+                                            let trimmedTitle = menuTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            menuTitle = trimmedTitle.isEmpty ? "My Menu" : trimmedTitle
+                                            menuSubtitle = menuSubtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                                            isEditingGroups = false
                                         }
-                                        isDraggingDish = false
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "checkmark")
+                                                .font(.system(size: 14, weight: .bold))
+                                            Text("Save")
+                                                .font(Theme.serif(14, weight: .semibold))
+                                        }
+                                        .foregroundStyle(Theme.paper)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(Theme.ink)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
                                     }
-                                )
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 4)
+                            } else {
+                                // Custom Toolbar with search, edit, and layout view buttons
+                                HStack(spacing: 12) {
+                                    if isSearchExpanded {
+                                        // Search bar
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "magnifyingglass")
+                                                .font(.system(size: 14, weight: .medium))
+                                                .foregroundStyle(Theme.inkFaded)
+                                            
+                                            TextField("Search dishes…", text: $searchText)
+                                                .font(Theme.serif(14))
+                                                .textInputAutocapitalization(.never)
+                                                .submitLabel(.search)
+                                            
+                                            Button {
+                                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                                    searchText = ""
+                                                    isSearchExpanded = false
+                                                }
+                                            } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .font(.system(size: 14))
+                                                    .foregroundStyle(Theme.inkSoft)
+                                            }
+                                            .buttonStyle(.plain)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .frame(height: 36)
+                                        .background(Color.white.opacity(0.55))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .cardStroke(cornerRadius: 12, inkOpacity: 0.15)
+                                    } else {
+                                        Spacer()
+                                        
+                                        // Collapsed Search icon
+                                        Button {
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                                isSearchExpanded = true
+                                            }
+                                        } label: {
+                                            Image(systemName: "magnifyingglass")
+                                                .font(.system(size: 16, weight: .semibold))
+                                                .foregroundStyle(Theme.ink)
+                                                .frame(width: 36, height: 36)
+                                                .background(Color.white.opacity(0.55))
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                .cardStroke(cornerRadius: 12, inkOpacity: 0.15)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityLabel("Search dishes")
+                                    }
+                                    
+                                    // Edit button next to search
+                                    Button {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            isEditingGroups = true
+                                        }
+                                    } label: {
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(Theme.ink)
+                                            .frame(width: 36, height: 36)
+                                            .background(Color.white.opacity(0.55))
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                            .cardStroke(cornerRadius: 12, inkOpacity: 0.15)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Edit menu title and description")
+                                    
+                                    // Layout switch Picker
+                                    Picker("", selection: $layout) {
+                                        ForEach(MenuLayout.allCases) { mode in
+                                            Image(systemName: mode.iconName)
+                                                .accessibilityLabel(mode.accessibilityLabel)
+                                                .tag(mode)
+                                        }
+                                    }
+                                    .pickerStyle(.segmented)
+                                    .labelsHidden()
+                                    .controlSize(.small)
+                                    .frame(width: 90)
+                                }
+                                .padding(.bottom, 12)
                             }
 
-                            let ungrouped = dishes.filter { $0.group == nil }
-                            if !ungrouped.isEmpty {
-                                MenuSection(
-                                    title: groups.isEmpty ? "All Dishes" : "Other Dishes",
-                                    subtitle: countLabel(ungrouped.count),
-                                    iconName: "tray",
-                                    canEdit: false,
-                                    dishes: ungrouped,
-                                    layout: layout,
-                                    isCollapsed: collapsedIDs.contains(Self.ungroupedSectionID),
-                                    isEditingGroups: isEditingGroups,
-                                    isDraggingDish: isDraggingDish,
-                                    draggedGroup: nil,
-                                    groups: [],
-                                    onToggle: { toggleCollapsed(Self.ungroupedSectionID) },
-                                    onAdd: nil,
-                                    onDelete: {},
-                                    onDragStart: handleDragStart,
-                                    onDropDish: { dish in
-                                        store.setGroup(nil, for: dish)
-                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                            var nextCollapsed = preDragCollapsedIDs
-                                            nextCollapsed.remove(Self.ungroupedSectionID)
-                                            collapsedIDs = nextCollapsed
-                                        }
-                                        isDraggingDish = false
+                            if !searchText.isEmpty && filteredDishes.isEmpty {
+                                VStack(spacing: 16) {
+                                    Image(systemName: "magnifyingglass")
+                                        .font(.system(size: 42, weight: .light))
+                                        .foregroundStyle(Theme.inkFaded)
+                                    Text("No dishes match \"\(searchText)\"")
+                                        .font(Theme.serif(16).italic())
+                                        .foregroundStyle(Theme.inkSoft)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.vertical, 40)
+                            } else {
+                                ForEach(groups) { group in
+                                    let groupDishes = dishesIn(group)
+                                    if !groupDishes.isEmpty || searchText.isEmpty {
+                                        MenuSection(
+                                            group: group,
+                                            dishes: groupDishes,
+                                            layout: layout,
+                                            isCollapsed: collapsedIDs.contains(group.id),
+                                            isEditingGroups: isEditingGroups,
+                                            isDraggingDish: isDraggingDish,
+                                            draggedGroup: $draggedGroup,
+                                            groups: groups,
+                                            onToggle: { toggleCollapsed(group.id) },
+                                            onAdd: { addingDishToGroup = group },
+                                            onDelete: { store.deleteGroup(group) },
+                                            onDragStart: handleDragStart,
+                                            onDropDish: { dish in
+                                                store.setGroup(group, for: dish)
+                                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                                    var nextCollapsed = preDragCollapsedIDs
+                                                    nextCollapsed.remove(group.id)
+                                                    collapsedIDs = nextCollapsed
+                                                }
+                                                isDraggingDish = false
+                                            }
+                                        )
                                     }
-                                )
+                                }
+
+                                let ungrouped = filteredDishes.filter { $0.group == nil }
+                                if !ungrouped.isEmpty {
+                                    MenuSection(
+                                        title: groups.isEmpty ? "All Dishes" : "Other Dishes",
+                                        subtitle: countLabel(ungrouped.count),
+                                        iconName: "tray",
+                                        canEdit: false,
+                                        dishes: ungrouped,
+                                        layout: layout,
+                                        isCollapsed: collapsedIDs.contains(Self.ungroupedSectionID),
+                                        isEditingGroups: isEditingGroups,
+                                        isDraggingDish: isDraggingDish,
+                                        draggedGroup: nil,
+                                        groups: [],
+                                        onToggle: { toggleCollapsed(Self.ungroupedSectionID) },
+                                        onAdd: nil,
+                                        onDelete: {},
+                                        onDragStart: handleDragStart,
+                                        onDropDish: { dish in
+                                            store.setGroup(nil, for: dish)
+                                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                                var nextCollapsed = preDragCollapsedIDs
+                                                nextCollapsed.remove(Self.ungroupedSectionID)
+                                                collapsedIDs = nextCollapsed
+                                            }
+                                            isDraggingDish = false
+                                        }
+                                    )
+                                }
                             }
 
                             NewGroupEditor(
@@ -182,30 +319,21 @@ struct MenuView: View {
                 return true
             }
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Dish.self) { DishDetailView(dish: $0) }
             .navigationDestination(for: DishGroup.self) { GroupDetailView(group: $0) }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Picker("View", selection: $layout) {
-                        ForEach(MenuLayout.allCases) { mode in
-                            Image(systemName: mode.iconName)
-                               .accessibilityLabel(mode.accessibilityLabel)
-                               .tag(mode)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 110)
-                }
-            }
+            .navigationDestination(for: Chef.self) { ChefDishesView(chef: $0) }
             .sheet(item: $addingDishToGroup) { group in
-                AddDishView(initialGroup: group) {
+                RecipeAssistantSheet(mode: .creator(initialGroup: group), onSaved: { addedDish in
                     addingDishToGroup = nil
-                }
+                    path.append(addedDish)
+                })
             }
             .sheet(isPresented: $isAddingDish) {
-                AddDishView {
+                RecipeAssistantSheet(mode: .creator(), onSaved: { addedDish in
                     isAddingDish = false
-                }
+                    path.append(addedDish)
+                })
             }
             .sheet(isPresented: $showingNewGroupEmojiPicker) {
                 EmojiPickerSheet(currentEmoji: newGroupEmoji) { emoji in
@@ -218,6 +346,9 @@ struct MenuView: View {
                 .presentationDetents([.medium, .large])
             }
             .onChange(of: isEditingGroups) { _, newValue in
+                if newValue {
+                    searchText = ""
+                }
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     if newValue {
                         preEditCollapsedIDs = collapsedIDs
@@ -252,15 +383,27 @@ struct MenuView: View {
                 .shadow(color: Theme.ink.opacity(0.22), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Add dish")
+        .accessibilityLabel("Add Dish")
+    }
+
+    private var filteredDishes: [Dish] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if query.isEmpty {
+            return dishes
+        }
+        return dishes.filter { dish in
+            dish.name.lowercased().contains(query) ||
+            dish.dishDescription.lowercased().contains(query) ||
+            dish.tags.contains { $0.lowercased().contains(query) }
+        }
     }
 
     private func dishesIn(_ group: DishGroup) -> [Dish] {
-        dishes.filter { $0.group?.id == group.id }
+        filteredDishes.filter { $0.group?.id == group.id }
     }
 
     private func countLabel(_ n: Int) -> String {
-        n == 1 ? "1 dish" : "\(n) dishes"
+        n == 1 ? "1 Dish" : "\(n) Dishes"
     }
 
     private func toggleCollapsed(_ id: UUID) {
@@ -377,33 +520,22 @@ private struct MenuHeader: View {
                 }
             }
 
-            Button {
-                if isEditing {
-                    finishEditing()
-                } else {
-                    isEditing = true
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Rectangle()
-                        .fill(Theme.ink)
-                        .frame(width: 36, height: 1)
-                    Image(systemName: isEditing ? "checkmark" : "pencil")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Theme.inkFaded)
-                    Rectangle()
-                        .fill(Theme.ink)
-                        .frame(width: 36, height: 1)
-                }
-                .padding(.top, 2)
-                .opacity(0.7)
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(Theme.ink.opacity(0.18))
+                    .frame(width: 36, height: 1)
+                Circle()
+                    .fill(Theme.ink.opacity(0.18))
+                    .frame(width: 4, height: 4)
+                Rectangle()
+                    .fill(Theme.ink.opacity(0.18))
+                    .frame(width: 36, height: 1)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isEditing ? "Save menu title and description" : "Edit menu title and description")
+            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        .padding(.top, 16)
+        .padding(.top, 58)
         .accessibilityElement(children: .contain)
     }
 
@@ -453,7 +585,7 @@ private struct MenuSection: View {
     private var resolvedIcon: String  { iconName ?? group?.iconName ?? "folder" }
     private var resolvedSubtitle: String {
         if let subtitle { return subtitle }
-        return dishes.count == 1 ? "1 dish" : "\(dishes.count) dishes"
+        return dishes.count == 1 ? "1 Dish" : "\(dishes.count) Dishes"
     }
 
     /// Returns the user-picked emoji if one is set; otherwise `nil` so we fall
@@ -470,131 +602,121 @@ private struct MenuSection: View {
             // Header: the logo is editable on its own; the title row toggles
             // collapse/expand. Renaming and deleting live in the ellipsis menu
             // so a plain tap never opens an editor by accident.
-            if isEditingGroups, let group = group {
-                HStack(spacing: 8) {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.inkSoft)
-                        .padding(.trailing, 4)
-
-                    groupLogo
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(resolvedTitle)
-                            .font(Theme.groupName(16))
-                            .foregroundStyle(Theme.ink)
-                        Text(resolvedSubtitle)
-                            .font(Theme.hand(12))
-                            .foregroundStyle(Theme.inkFaded)
-                        Spacer(minLength: 0)
-                    }
-                }
-                .padding(6)
-                .background(Color.clear)
-                .cornerRadius(8)
-                .contentShape(Rectangle())
-                .onDrag {
-                    if let draggedGroup = draggedGroup {
-                        draggedGroup.wrappedValue = group
-                    }
-                    return NSItemProvider(object: group.id.uuidString as NSString)
-                }
-                .onDrop(of: [.text], delegate: GroupDropDelegate(
-                    item: group,
-                    draggedItem: draggedGroup ?? .constant(nil),
-                    groups: groups,
-                    store: store
-                ))
-            } else {
-                HStack(spacing: 8) {
-                    Button(action: onToggle) {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
+            Group {
+                if isEditingGroups, let group = group {
+                    HStack(spacing: 8) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.inkSoft)
-                            .rotationEffect(.degrees(isCollapsed ? -90 : 0))
-                            .frame(width: 32, height: 32)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isCollapsed ? "Expand \(resolvedTitle)" : "Collapse \(resolvedTitle)")
+                            .padding(.trailing, 4)
+                            .offset(x: -10)
 
-                    if let group {
-                        NavigationLink(value: group) {
-                            HStack(spacing: 8) {
-                                groupLogo
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text(resolvedTitle)
-                                        .font(Theme.groupName(21))
-                                        .foregroundStyle(Theme.ink)
-                                    Text(resolvedSubtitle)
-                                        .font(Theme.hand(14))
-                                        .foregroundStyle(Theme.inkFaded)
-                                    Spacer(minLength: 0)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Button(action: onToggle) {
-                            HStack(spacing: 8) {
-                                groupLogo
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text(resolvedTitle)
-                                        .font(Theme.groupName(isEditingGroups ? 16 : 21))
-                                        .foregroundStyle(Theme.ink)
-                                    Text(resolvedSubtitle)
-                                        .font(Theme.hand(isEditingGroups ? 12 : 14))
-                                        .foregroundStyle(Theme.inkFaded)
-                                    Spacer(minLength: 0)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if let onAdd {
-                        Button(action: onAdd) {
-                            Image(systemName: "plus.circle")
-                                .font(.system(size: 18, weight: .semibold))
+                        groupLogo
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(resolvedTitle)
+                                .font(Theme.groupName(16))
                                 .foregroundStyle(Theme.ink)
+                            Text(resolvedSubtitle)
+                                .font(Theme.hand(12))
+                                .foregroundStyle(Theme.inkFaded)
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    .padding(6)
+                    .background(Theme.paper)
+                    .cornerRadius(8)
+                    .contentShape(Rectangle())
+                    .onDrag {
+                        if let draggedGroup = draggedGroup {
+                            draggedGroup.wrappedValue = group
+                        }
+                        return NSItemProvider(object: group.id.uuidString as NSString)
+                    }
+                    .onDrop(of: [.text], delegate: GroupDropDelegate(
+                        item: group,
+                        draggedItem: draggedGroup ?? .constant(nil),
+                        groups: groups,
+                        store: store
+                    ))
+                } else {
+                    HStack(spacing: 8) {
+                        Button(action: onToggle) {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Theme.inkSoft)
+                                .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Add dish to \(resolvedTitle)")
-                    }
+                        .accessibilityLabel(isCollapsed ? "Expand \(resolvedTitle)" : "Collapse \(resolvedTitle)")
+                        .offset(x: -10)
 
-                    if canEdit, group != nil {
-                        Menu {
-                            Button {
-                                pendingAction = .rename
-                            } label: { Label("Rename", systemImage: "pencil") }
-                            Button(role: .destructive) {
-                                pendingAction = .delete
-                            } label: { Label("Delete group", systemImage: "trash") }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .foregroundStyle(Theme.inkSoft)
-                                .padding(.leading, 4)
+                        if let group {
+                            NavigationLink(value: group) {
+                                HStack(spacing: 8) {
+                                    groupLogo
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        Text(resolvedTitle)
+                                            .font(Theme.groupName(21))
+                                            .foregroundStyle(Theme.ink)
+                                        Text(resolvedSubtitle)
+                                            .font(Theme.hand(14))
+                                            .foregroundStyle(Theme.inkFaded)
+                                        Spacer(minLength: 0)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button(action: onToggle) {
+                                HStack(spacing: 8) {
+                                    groupLogo
+                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                        Text(resolvedTitle)
+                                            .font(Theme.groupName(isEditingGroups ? 16 : 21))
+                                            .foregroundStyle(Theme.ink)
+                                        Text(resolvedSubtitle)
+                                            .font(Theme.hand(isEditingGroups ? 12 : 14))
+                                            .foregroundStyle(Theme.inkFaded)
+                                        Spacer(minLength: 0)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if let onAdd {
+                            Button(action: onAdd) {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 18, weight: .regular))
+                                    .foregroundStyle(Theme.inkSoft)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Add dish to \(resolvedTitle)")
                         }
                     }
-                }
-                .padding(6)
-                .background(isTargeted ? Theme.highlight.opacity(0.18) : Color.clear)
-                .cornerRadius(8)
-                .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isTargeted)
-                .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
-                    guard let provider = providers.first else { return false }
-                    _ = provider.loadObject(ofClass: NSString.self) { string, error in
-                        if let uuidString = string as? String,
-                           let uuid = UUID(uuidString: uuidString) {
-                            DispatchQueue.main.async {
-                                if let dish = store.allDishes().first(where: { $0.id == uuid }) {
-                                    onDropDish?(dish)
+                    .padding(6)
+                    .background(isTargeted ? Theme.highlight.opacity(0.18) : Theme.paper)
+                    .cornerRadius(8)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.85), value: isTargeted)
+                    .onDrop(of: [.text], isTargeted: $isTargeted) { providers in
+                        guard let provider = providers.first else { return false }
+                        _ = provider.loadObject(ofClass: NSString.self) { string, error in
+                            if let uuidString = string as? String,
+                               let uuid = UUID(uuidString: uuidString) {
+                                DispatchQueue.main.async {
+                                    if let dish = store.allDishes().first(where: { $0.id == uuid }) {
+                                        onDropDish?(dish)
+                                    }
                                 }
                             }
                         }
+                        return true
                     }
-                    return true
                 }
             }
+            .zIndex(1)
 
             // Separator + dishes form a single accordion body. Gating them
             // through one `if !isCollapsed` means SwiftUI removes them as a
@@ -626,9 +748,9 @@ private struct MenuSection: View {
                             ForEach(dishes) { dish in
                                 NavigationLink(value: dish) {
                                     if layout == .cards {
-                                        DishCardView(dish: dish, isCompactStyle: isDraggingDish)
+                                        DishCardView(dish: dish, isCompactStyle: false)
                                     } else {
-                                        CompactDishRow(dish: dish, isCompactStyle: isDraggingDish)
+                                        CompactDishRow(dish: dish, isCompactStyle: false)
                                     }
                                 }
                                 .buttonStyle(.plain)
@@ -652,8 +774,8 @@ private struct MenuSection: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
                 .padding(.bottom, isEditingGroups ? 0 : 14)
-                .zIndex(-1)
-                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(0)
+                .transition(.opacity)
             }
         }
         // Keep the outer paddings CONSTANT relative to `isCollapsed`. The
@@ -1183,4 +1305,10 @@ struct GroupDropDelegate: DropDelegate {
             }
         }
     }
+}
+
+#Preview {
+    MenuView()
+        .environmentObject(AppConfig.shared)
+        .environmentObject(DishStore())
 }

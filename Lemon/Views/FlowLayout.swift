@@ -3,8 +3,11 @@ import SwiftUI
 /// Simple wrapping layout for chips/tags. It keeps the hand-made menu UI from
 /// needing rigid grids when tag names have different lengths.
 struct FlowLayout: Layout {
+    enum Alignment { case leading, center }
+
     var spacing: CGFloat = 8
     var rowSpacing: CGFloat = 8
+    var alignment: Alignment = .leading
 
     func sizeThatFits(
         proposal: ProposedViewSize,
@@ -28,7 +31,10 @@ struct FlowLayout: Layout {
     ) {
         var y = bounds.minY
         for row in rows(for: subviews, maxWidth: bounds.width) {
-            var x = bounds.minX
+            let startX = alignment == .center
+                ? bounds.minX + (bounds.width - row.width) / 2
+                : bounds.minX
+            var x = startX
             for item in row.items {
                 subviews[item.index].place(
                     at: CGPoint(x: x, y: y),

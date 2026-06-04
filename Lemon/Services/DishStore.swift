@@ -18,7 +18,7 @@ private enum MealPlanStoreError: LocalizedError {
 @MainActor
 final class DishStore: ObservableObject {
     static let sharedContainer: ModelContainer = {
-        let schema = Schema([Dish.self, DishGroup.self, DishPhoto.self, TodayDishEntry.self])
+        let schema = Schema([Dish.self, Chef.self, DishGroup.self, DishPhoto.self, TodayDishEntry.self])
         // Keep container name so existing installs keep the same on-disk SwiftData store.
         let config = ModelConfiguration("AIMenu", schema: schema)
         do {
@@ -29,6 +29,12 @@ final class DishStore: ObservableObject {
     }()
 
     @Published var statusMessage: String?
+    
+    @Published var copilotHistories: [UUID: [AssistantChatLine]] = [:]
+    @Published var creatorHistory: [AssistantChatLine] = []
+    @Published var creatorStagedCandidates: [DishCandidate] = []
+    @Published var todayHistory: [AssistantChatLine] = []
+    @Published var todayLastGeneratedPlan: AIDayMealPlan? = nil
 
     private(set) lazy var gemini = GeminiService(config: AppConfig.shared)
     private var context: ModelContext { Self.sharedContainer.mainContext }
@@ -47,7 +53,18 @@ final class DishStore: ObservableObject {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    func allChefs() -> [Chef] {
+        let descriptor = FetchDescriptor<Chef>(
+            sortBy: [SortDescriptor(\.name), SortDescriptor(\.createdAt)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
     // MARK: - Dish mutations
+
+    func save() {
+        try? context.save()
+    }
 
     func insertDish(_ dish: Dish) {
         context.insert(dish)
@@ -64,6 +81,49 @@ final class DishStore: ObservableObject {
         try? context.save()
     }
 
+    func setChef(_ chef: Chef?, for dish: Dish) {
+        if let chef {
+            dish.chefs = [chef]
+        } else {
+            dish.chefs = []
+        }
+        try? context.save()
+    }
+
+    func setChefs(_ chefs: [Chef], for dish: Dish) {
+        dish.chefs = chefs
+        try? context.save()
+    }
+
+    func createChef(name: String, avatarImage: UIImage? = nil) -> Chef? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+        let chef = Chef(
+            name: trimmedName,
+            avatarData: avatarImage?.compressedJPEGForAvatar()
+        )
+        context.insert(chef)
+        try? context.save()
+        return chef
+    }
+
+    func updateChef(_ chef: Chef, name: String, avatarImage: UIImage?, removeAvatar: Bool = false) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        chef.name = trimmedName
+        if removeAvatar {
+            chef.avatarData = nil
+        } else if let avatarImage {
+            chef.avatarData = avatarImage.compressedJPEGForAvatar()
+        }
+        try? context.save()
+    }
+
+    func deleteChef(_ chef: Chef) {
+        context.delete(chef)
+        try? context.save()
+    }
+
     func updateDishDetails(_ dish: Dish, name: String, description: String) {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { return }
@@ -71,25 +131,6 @@ final class DishStore: ObservableObject {
         dish.dishDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
         try? context.save()
     }
-
-    /// Update chef attribution for a dish. Pass `nil` for `avatarImage` to
-    /// keep the existing avatar unchanged; pass a `UIImage` to replace it.
-    /// Passing an empty string for `name` clears the chef credit entirely.
-    func updateChef(_ dish: Dish, name: String, avatarImage: UIImage?) {
-        dish.chefName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let image = avatarImage {
-            // Compress to JPEG at 0.80 quality — good enough for a small avatar.
-            dish.chefAvatarData = image.jpegData(compressionQuality: 0.80)
-        }
-        try? context.save()
-    }
-
-    /// Clears the chef avatar photo only (keeps the name intact).
-    func removeChefAvatar(_ dish: Dish) {
-        dish.chefAvatarData = nil
-        try? context.save()
-    }
-
 
     /// Replace a dish's tags in one save. Normalization trims whitespace,
     /// collapses duplicate tags case-insensitively, and preserves display text.
@@ -160,7 +201,7 @@ final class DishStore: ObservableObject {
     }
 
     /// Regenerate the menu illustration with Gemini (optional art-direction text).
-    func redrawMenuIllustration(_ dish: Dish, artDirection: String?) async throws {
+    func redrawMenuIllustration(_ dish: Dish, artDirection: String?, image: UIImage? = nil) async throws {
         statusMessage = "Redrawing your dish…"
         defer { statusMessage = nil }
         let trimmedName = dish.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -168,7 +209,8 @@ final class DishStore: ObservableObject {
         let data = try await gemini.generateIllustration(
             dishName: trimmedName,
             dishDescription: dish.dishDescription,
-            artDirection: artDirection
+            artDirection: artDirection,
+            image: image
         )
         dish.imageData = data
         try? context.save()
@@ -383,32 +425,35 @@ final class DishStore: ObservableObject {
         )
     }
 
-    func extractRecipe(from image: UIImage) async throws -> ExtractedRecipe {
-        statusMessage = "Reading the recipe from your photo…"
-        defer { statusMessage = nil }
-        return try await gemini.extractRecipe(from: image)
+    func extractRecipe(from image: UIImage, currentRecipe: String = "") async throws -> ExtractedRecipe {
+        return try await extractRecipe(from: [image], userPrompt: "", currentRecipe: currentRecipe)
+    }
+
+    func extractRecipe(from images: [UIImage], userPrompt: String = "", currentRecipe: String = "") async throws -> ExtractedRecipe {
+        return try await gemini.extractRecipe(from: images, userPrompt: userPrompt, currentRecipe: currentRecipe)
     }
 
     /// Extract a recipe from free-form text the user typed/pasted in.
-    func extractRecipe(fromText text: String) async throws -> ExtractedRecipe {
-        statusMessage = "Reading the recipe from your notes…"
-        defer { statusMessage = nil }
-        return try await gemini.extractRecipe(fromText: text)
+    func extractRecipe(fromText text: String, currentRecipe: String = "") async throws -> ExtractedRecipe {
+        return try await gemini.extractRecipe(fromText: text, currentRecipe: currentRecipe)
     }
 
     /// Extract a recipe from a video URL (YouTube only for now — see the
     /// note in `GeminiService.extractRecipe(fromVideoURL:)`).
-    func extractRecipe(fromVideoURL urlString: String) async throws -> ExtractedRecipe {
-        statusMessage = "Watching the video for a recipe…"
-        defer { statusMessage = nil }
-        return try await gemini.extractRecipe(fromVideoURL: urlString)
+    func extractRecipe(fromVideoURL urlString: String, currentRecipe: String = "") async throws -> ExtractedRecipe {
+        return try await gemini.extractRecipe(fromVideoURL: urlString, currentRecipe: currentRecipe)
     }
 
     // MARK: - AI day plan (Today)
 
     /// Ask Gemini to assign saved dishes to each meal slot. Caller typically
-    /// follows with `replaceTodayEntries(with:day:mealNames:)` to apply it.
-    func generateDayMealPlanForToday(day: Date, mealNames: [String], userNote: String?) async throws -> AIDayMealPlan {
+    /// follows with `replaceTodayEntries(with:day:mealNames:)` to update today entries.
+    func generateDayMealPlanForToday(
+        day: Date,
+        mealNames: [String],
+        userNote: String?,
+        history: [ChatTurn] = []
+    ) async throws -> AIDayMealPlan {
         statusMessage = "Planning your day from the menu…"
         defer { statusMessage = nil }
 
@@ -418,39 +463,283 @@ final class DishStore: ObservableObject {
         let dayStart = Calendar.current.startOfDay(for: day)
         let desc = dayStart.formatted(.dateTime.weekday(.wide).month(.wide).day().year())
         let catalog = dishes.map { ($0.id, $0.name, $0.tags) }
+        let userPrefs = getStoredUserPreferences()
+        
         return try await gemini.generateDayMealPlan(
             mealNames: mealNames,
             dishCatalog: catalog,
             formattedDayDescription: desc,
-            userNote: userNote
+            userNote: userNote,
+            userPreferences: userPrefs,
+            history: history
         )
     }
 
-    /// Remove every `TodayDishEntry` on this calendar day, then insert planned dishes.
+    private func keyForDay(_ day: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: day)
+        return "Lemon.todayMealNames.\(dateStr)"
+    }
+
+    /// Remove existing `TodayDishEntry` on this calendar day ONLY for the meals present in the AI's plan,
+    /// and dynamically register any newly planned meals in the user's active meals list in UserDefaults for this day.
     func replaceTodayEntries(with plan: AIDayMealPlan, day: Date, mealNames: [String]) {
         let dayStart = Calendar.current.startOfDay(for: day)
         let existing = (try? context.fetch(FetchDescriptor<TodayDishEntry>())) ?? []
+        
+        // 1. Gather all meal names present in the new plan
+        let plannedMeals = plan.assignments.map { $0.mealName.trimmingCharacters(in: .whitespacesAndNewlines) }
+        
+        // 2. Only delete existing entries for this day if their meal is in the planned meals (case-insensitively)
         for entry in existing where entry.day == dayStart {
-            context.delete(entry)
+            let matchesPlanned = plannedMeals.contains { $0.caseInsensitiveCompare(entry.meal) == .orderedSame }
+            if matchesPlanned {
+                context.delete(entry)
+            }
         }
 
         let dishes = allDishes()
         let byId = Dictionary(uniqueKeysWithValues: dishes.map { ($0.id, $0) })
 
-        func canonicalMeal(for raw: String) -> String? {
+        // 3. Read and parse the current active meals from UserDefaults for this day (split by newline)
+        let dayKey = keyForDay(dayStart)
+        let storedValue = UserDefaults.standard.string(forKey: dayKey) ?? ""
+        var activeMeals = storedValue.split(separator: "\n")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        
+        // Fallback to global defaults if the day-specific list is empty
+        if activeMeals.isEmpty {
+            let globalValue = UserDefaults.standard.string(forKey: "Lemon.todayMealNames") ?? ""
+            activeMeals = globalValue.split(separator: "\n")
+                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+        }
+        
+        // Default meals if active list is empty
+        if activeMeals.isEmpty {
+            activeMeals = TodayMeal.allCases.map(\.rawValue)
+        }
+        
+        var updatedMeals = activeMeals
+        var mealsAdded = false
+
+        func getOrCreateCanonicalMeal(for raw: String) -> String? {
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
-            return mealNames.first { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+            
+            // Try to match an existing active meal case-insensitively
+            if let existingMeal = updatedMeals.first(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+                return existingMeal
+            }
+            
+            // If the meal is not active in the planner, register/add it dynamically!
+            updatedMeals.append(trimmed)
+            mealsAdded = true
+            return trimmed
         }
 
         for assignment in plan.assignments {
-            guard let meal = canonicalMeal(for: assignment.mealName) else { continue }
+            guard let meal = getOrCreateCanonicalMeal(for: assignment.mealName) else { continue }
             for id in assignment.dishIds {
                 guard let dish = byId[id] else { continue }
                 addToToday(dish, day: dayStart, mealName: meal, courseName: "")
             }
         }
+
+        // 4. Save updated active meals back to UserDefaults day-specific key if any new ones were added (joined by newline)
+        if mealsAdded {
+            var seen = Set<String>()
+            let serialized = updatedMeals.compactMap { name -> String? in
+                let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return nil }
+                let key = trimmed.lowercased()
+                guard !seen.contains(key) else { return nil }
+                seen.insert(key)
+                return trimmed
+            }.joined(separator: "\n")
+            UserDefaults.standard.set(serialized, forKey: dayKey)
+        }
+
         try? context.save()
+    }
+
+    /// Ask the Gemini Sous Chef conversational copilot to process a request.
+    func converseWithAssistant(
+        prompt: String,
+        image: UIImage?,
+        dish: Dish,
+        history: [ChatTurn]
+    ) async throws -> AssistantAction {
+        var recipeString = ""
+        if !dish.ingredients.isEmpty {
+            recipeString += "Ingredients:\n"
+            for ing in dish.ingredients {
+                recipeString += "- \(ing)\n"
+            }
+        }
+        if !dish.steps.isEmpty {
+            if !recipeString.isEmpty { recipeString += "\n" }
+            recipeString += "Steps:\n"
+            for (idx, step) in dish.steps.enumerated() {
+                recipeString += "\(idx + 1). \(step)\n"
+            }
+        }
+        
+        let tagsList = dish.tags
+        let chefsList = dish.chefs.map { $0.name }
+        let groupName = dish.group?.name ?? "None"
+        let userPrefs = getStoredUserPreferences()
+        
+        return try await gemini.converseWithAssistant(
+            role: .copilot,
+            prompt: prompt,
+            image: image,
+            dishName: dish.name,
+            dishDescription: dish.dishDescription,
+            currentRecipe: recipeString,
+            groupName: groupName,
+            tags: tagsList,
+            chefs: chefsList,
+            userPreferences: userPrefs,
+            history: history
+        )
+    }
+
+    /// Ask the Gemini Creator Sous Chef conversational copilot to process a request for new dishes.
+    func converseWithCreator(
+        prompt: String,
+        image: UIImage?,
+        draftDishesNames: String,
+        currentRecipe: String,
+        groupName: String,
+        tags: [String],
+        chefs: [String],
+        availableGroups: [String] = [],
+        history: [ChatTurn]
+    ) async throws -> AssistantAction {
+        let userPrefs = getStoredUserPreferences()
+        
+        return try await gemini.converseWithAssistant(
+            role: .creator,
+            prompt: prompt,
+            image: image,
+            dishName: draftDishesNames,
+            dishDescription: "",
+            currentRecipe: currentRecipe,
+            groupName: groupName,
+            tags: tags,
+            chefs: chefs,
+            availableGroups: availableGroups,
+            userPreferences: userPrefs,
+            history: history
+        )
+    }
+
+    // MARK: - User Preferences Storage and Dynamic Detection
+
+    func getStoredUserPreferences() -> [String] {
+        return UserDefaults.standard.stringArray(forKey: "Lemon.userPreferences") ?? []
+    }
+
+    func saveUserPreference(_ preference: String) {
+        let trimmed = preference.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var prefs = getStoredUserPreferences()
+        if !prefs.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            prefs.append(trimmed)
+            UserDefaults.standard.set(prefs, forKey: "Lemon.userPreferences")
+            objectWillChange.send()
+        }
+    }
+
+    func removeUserPreference(_ preference: String) {
+        var prefs = getStoredUserPreferences()
+        prefs.removeAll { $0.caseInsensitiveCompare(preference) == .orderedSame }
+        UserDefaults.standard.set(prefs, forKey: "Lemon.userPreferences")
+        objectWillChange.send()
+    }
+
+    func detectAndSaveUserPreference(from text: String) async -> String? {
+        guard let preference = try? await gemini.detectUserPreference(from: text) else { return nil }
+        saveUserPreference(preference)
+        return preference
+    }
+
+    /// Link a chef to a dish by name, automatically finding an existing chef or creating a new one.
+    func linkChef(named chefName: String, to dish: Dish) {
+        let trimmed = chefName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        
+        let chefsList = allChefs()
+        let canonicalName = trimmed.lowercased()
+        if let existing = chefsList.first(where: { $0.name.lowercased() == canonicalName }) {
+            if !dish.chefs.contains(where: { $0.id == existing.id }) {
+                dish.chefs.append(existing)
+            }
+        } else {
+            if let newChef = createChef(name: trimmed) {
+                dish.chefs.append(newChef)
+            }
+        }
+        try? context.save()
+    }
+
+    // MARK: - Persistent Assistant Session Helpers
+    
+    func getCopilotHistory(for dishId: UUID) -> [AssistantChatLine] {
+        return copilotHistories[dishId] ?? []
+    }
+    
+    func setCopilotHistory(_ history: [AssistantChatLine], for dishId: UUID) {
+        copilotHistories[dishId] = history
+    }
+    
+    func clearCopilotHistory(for dishId: UUID) {
+        copilotHistories[dishId] = nil
+    }
+    
+    func getCreatorHistory() -> [AssistantChatLine] {
+        return creatorHistory
+    }
+    
+    func setCreatorHistory(_ history: [AssistantChatLine]) {
+        creatorHistory = history
+    }
+    
+    func getCreatorCandidates() -> [DishCandidate] {
+        return creatorStagedCandidates
+    }
+    
+    func setCreatorCandidates(_ candidates: [DishCandidate]) {
+        creatorStagedCandidates = candidates
+    }
+    
+    func clearCreatorSession() {
+        creatorHistory = []
+        creatorStagedCandidates = []
+    }
+    
+    func getTodayHistory() -> [AssistantChatLine] {
+        return todayHistory
+    }
+    
+    func setTodayHistory(_ history: [AssistantChatLine]) {
+        todayHistory = history
+    }
+    
+    func getTodayLastGeneratedPlan() -> AIDayMealPlan? {
+        return todayLastGeneratedPlan
+    }
+    
+    func setTodayLastGeneratedPlan(_ plan: AIDayMealPlan?) {
+        todayLastGeneratedPlan = plan
+    }
+    
+    func clearTodaySession() {
+        todayHistory = []
+        todayLastGeneratedPlan = nil
     }
 }
 
@@ -467,6 +756,24 @@ private extension UIImage {
 
         let format = UIGraphicsImageRendererFormat.default()
         format.scale = 1   // Render at 1x so pixel dimensions match `target`.
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
+        let resized = renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: target))
+        }
+        return resized.jpegData(compressionQuality: quality)
+    }
+
+    /// Compress a chef/profile portrait. These render very small in the app, so
+    /// capping at 400 px keeps storage low while staying crisp on Retina screens.
+    func compressedJPEGForAvatar(maxDimension: CGFloat = 400, quality: CGFloat = 0.82) -> Data? {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > 1 else { return nil }
+        let scale = min(1, maxDimension / longestSide)
+        let target = CGSize(width: floor(size.width * scale), height: floor(size.height * scale))
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
         format.opaque = true
         let renderer = UIGraphicsImageRenderer(size: target, format: format)
         let resized = renderer.image { _ in
